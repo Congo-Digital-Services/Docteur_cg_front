@@ -1,0 +1,37 @@
+[
+    { "id": "s1", "doctorId": "d1", "iso": "2025-09-25T09:00:00.000Z", "taken": false },
+    { "id": "s2", "doctorId": "d1", "iso": "2025-09-25T09:30:00.000Z", "taken": false },
+    { "id": "s3", "doctorId": "d1", "iso": "2025-09-25T10:00:00.000Z", "taken": true },
+  
+    { "id": "s4", "doctorId": "d2", "iso": "2025-09-25T11:00:00.000Z", "taken": false },
+    { "id": "s5", "doctorId": "d2", "iso": "2025-09-26T09:00:00.000Z", "taken": false },
+  
+    { "id": "s6", "doctorId": "d3", "iso": "2025-09-26T10:00:00.000Z", "taken": false },
+    { "id": "s7", "doctorId": "d3", "iso": "2025-09-27T10:30:00.000Z", "taken": false },
+  
+    { "id": "s8", "doctorId": "d4", "iso": "2025-09-25T15:00:00.000Z", "taken": false },
+    { "id": "s9", "doctorId": "d4", "iso": "2025-09-26T15:30:00.000Z", "taken": false },
+  
+    { "id": "s10", "doctorId": "d5", "iso": "2025-09-27T08:30:00.000Z", "taken": false },
+    { "id": "s11", "doctorId": "d6", "iso": "2025-09-28T14:00:00.000Z", "taken": false },
+    { "id": "s12", "doctorId": "d7", "iso": "2025-09-29T13:00:00.000Z", "taken": false },
+  
+    { "id": "s13", "doctorId": "d8", "iso": "2025-09-25T13:30:00.000Z", "taken": true },
+    { "id": "s14", "doctorId": "d9", "iso": "2025-09-26T13:30:00.000Z", "taken": false },
+  
+    { "id": "s15", "doctorId": "d10", "iso": "2025-09-27T17:00:00.000Z", "taken": false },
+  
+    { "id": "s16", "doctorId": "d11", "iso": "2025-09-25T09:00:00.000Z", "taken": false },
+    { "id": "s17", "doctorId": "d12", "iso": "2025-09-25T09:00:00.000Z", "taken": false },
+    { "id": "s18", "doctorId": "d13", "iso": "2025-09-25T09:00:00.000Z", "taken": false },
+  
+    { "id": "s19", "doctorId": "d14", "iso": "2025-09-25T09:00:00.000Z", "taken": true },
+    { "id": "s20", "doctorId": "d15", "iso": "2025-09-25T09:00:00.000Z", "taken": false },
+  
+    { "id": "s21", "doctorId": "d16", "iso": "2025-09-26T11:30:00.000Z", "taken": false },
+    { "id": "s22", "doctorId": "d17", "iso": "2025-09-26T12:00:00.000Z", "taken": false },
+    { "id": "s23", "doctorId": "d18", "iso": "2025-09-26T12:30:00.000Z", "taken": false },
+    { "id": "s24", "doctorId": "d19", "iso": "2025-09-27T09:00:00.000Z", "taken": false },
+    { "id": "s25", "doctorId": "d20", "iso": "2025-09-27T09:30:00.000Z", "taken": false }
+  ]
+  

@@ -1,20 +1,25 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+//import 'react-native-gesture-handler';
 
-export default function App() {
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { ThemeProvider, useThemeMode } from './src/theme/ThemeContext';
+import RootNavigator from './src/navigation/RootNavigator';
+import Toast from './src/components/Toast';
+
+function ThemedNav() {
+  const { mode } = useThemeMode();
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <NavigationContainer theme={mode === 'dark' ? DarkTheme : DefaultTheme}>
+      <RootNavigator />
+      <Toast />
+    </NavigationContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemedNav />
+    </ThemeProvider>
+  );
+}

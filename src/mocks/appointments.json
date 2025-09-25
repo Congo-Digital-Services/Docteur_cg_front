@@ -1,0 +1,6 @@
+[
+    { "id": "a_demo1", "doctorId": "d3", "slotId": "s6", "status": "CONFIRMED" },
+    { "id": "a_demo2", "doctorId": "d5", "slotId": "s10", "status": "PENDING" },
+    { "id": "a_demo3", "doctorId": "d11", "slotId": "s16", "status": "DECLINED" }
+  ]
+  
