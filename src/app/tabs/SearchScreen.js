@@ -1,31 +1,26 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, Animated, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, Animated, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { colors, spacing, radius, textStyles } from '../../theme';
 import Input from '../../components/Input';
-import Button from '../../components/Button';
 import Card from '../../components/Card';
-import DoctoCard from '../../components/DoctoCard';
-import useSearchStore from '../../stores/search.store';
+import doctors from '../../mocks/doctors.json';
 import specialties from '../../mocks/specialties.json';
-import cities from '../../mocks/cities.json';
-import * as Location from 'expo-location';
-import { haversineKm } from '../../utils/distance';
-import { spacing } from '../../theme/spacing';
-import colors from '../../theme/colors';
-import { textStyles } from '../../theme/typography';
 
 export default function SearchScreen({ navigation }) {
-  const { filters, setFilters, results, run, location, setLocation } = useSearchStore();
-  const [distances, setDistances] = useState({});
-  const [locDenied, setLocDenied] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const insets = useSafeAreaInsets();
+  const [isSearching, setIsSearching] = useState(false);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => { 
-    run();
+  useEffect(() => {
     // Animation d'entrée
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -41,170 +36,143 @@ export default function SearchScreen({ navigation }) {
     ]).start();
   }, []);
 
-  const askLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      setLocDenied(true);
-      setLocation(null);
+  // Recherche en temps réel
+  useEffect(() => {
+    if (searchQuery.length === 0) {
+      setSearchResults([]);
       return;
     }
-    const loc = await Location.getCurrentPositionAsync({});
-    const my = { lat: loc.coords.latitude, lng: loc.coords.longitude };
-    setLocation(my);
-    setLocDenied(false);
+
+    setIsSearching(true);
+    
+    // Simulation d'un délai de recherche
+    const timeout = setTimeout(() => {
+      const results = doctors.filter(doctor => {
+        const query = searchQuery.toLowerCase();
+        const fullName = `${doctor.title} ${doctor.lastName}`.toLowerCase();
+        return (
+          fullName.includes(query) ||
+          (doctor.specialty && doctor.specialty.toLowerCase().includes(query)) ||
+          (doctor.city && doctor.city.toLowerCase().includes(query))
+        );
+      });
+      
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const handleDoctorPress = (doctor) => {
+    navigation.navigate('BookingStack', { 
+      screen: 'DoctorDetails', 
+      params: { doctor } 
+    });
   };
 
-  useEffect(() => {
-    if (!location) return;
-    const map = {};
-    for (const d of results) {
-      map[d.id] = haversineKm(location, { lat: d.lat, lng: d.lng });
-    }
-    setDistances(map);
-  }, [location, results]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await run();
-    setRefreshing(false);
-  };
-
-  const clearFilters = () => {
-    setFilters({ name: '', specialty: null, city: null });
-  };
-
-  const hasActiveFilters = filters.name || filters.specialty || filters.city;
+  const renderDoctorItem = ({ item }) => (
+    <Pressable onPress={() => handleDoctorPress(item)} style={s.doctorItem}>
+      <View style={s.doctorCard}>
+        <View style={s.doctorContent}>
+          <View style={s.doctorAvatar}>
+            <Ionicons name="medical" size={24} color={colors.primary} />
+          </View>
+          <View style={s.doctorInfo}>
+            <Text style={s.doctorName}>{item.title} {item.lastName}</Text>
+            <Text style={s.doctorSpecialty}>{item.specialty}</Text>
+            <View style={s.doctorLocation}>
+              <Ionicons name="location" size={14} color={colors.textSecondary} />
+              <Text style={s.doctorAddress}>{item.city}</Text>
+            </View>
+          </View>
+          <View style={s.doctorActions}>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
 
   return (
-    <View style={s.container}>
-      <Animated.View style={[
-        s.content,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
-      ]}>
-        {/* Header */}
+    <SafeAreaView style={s.container} edges={['top']}>
+      {/* Header exactement comme l'écran de détails */}
+      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <View style={s.header}>
+          <View style={{ width: 24 }} />
           <Text style={s.title}>Rechercher un médecin</Text>
-          <Text style={s.subtitle}>Trouvez le professionnel de santé adapté à vos besoins</Text>
+          <View style={{ width: 24 }} />
         </View>
+      </LinearGradient>
 
-        {/* Filters Card */}
-        <Card style={s.filtersCard} elevation="low">
-          <View style={s.filtersHeader}>
-            <Text style={s.filtersTitle}>Filtres de recherche</Text>
-            {hasActiveFilters && (
-              <Button
-                title="Effacer"
-                variant="tertiary"
-                size="small"
-                onPress={clearFilters}
+      {/* Search Input fixe */}
+      <View style={s.searchContainer}>
+        <Input 
+          placeholder="Nom, spécialité ou établissement..." 
+          value={searchQuery} 
+          onChangeText={setSearchQuery}
+          icon={<Ionicons name="search" size={20} color={colors.textSecondary} />}
+        />
+      </View>
+
+      <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false}>
+        <Animated.View style={[
+          s.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}>
+
+          {/* Search Results */}
+          {searchQuery.length > 0 && (
+            <View style={s.resultsSection}>
+              <View style={s.resultsHeader}>
+                <Text style={s.resultsTitle}>
+                  {isSearching ? 'Recherche...' : `Résultats (${searchResults.length})`}
+                </Text>
+              </View>
+
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderDoctorItem}
+                ListEmptyComponent={
+                  !isSearching && (
+                    <Card style={s.emptyCard} variant="filled">
+                      <View style={s.emptyContent}>
+                        <Ionicons name="search" size={48} color={colors.textTertiary} />
+                        <Text style={s.emptyTitle}>Aucun médecin trouvé</Text>
+                        <Text style={s.emptySubtitle}>
+                          Essayez avec d'autres mots-clés
+                        </Text>
+                      </View>
+                    </Card>
+                  )
+                }
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+                contentContainerStyle={s.listContent}
               />
-            )}
-          </View>
-          
-          <Input 
-            label="Nom du médecin"
-            placeholder="Ex: Dr Martin" 
-            value={filters.name} 
-            onChangeText={(v) => setFilters({ name: v })} 
-          />
-          
-          <Input 
-            label="Spécialité"
-            placeholder="Ex: Dermatologue" 
-            value={filters.specialty || ''} 
-            onChangeText={(v) => setFilters({ specialty: v || null })} 
-          />
-          
-          <Input 
-            label="Ville"
-            placeholder="Ex: Paris" 
-            value={filters.city || ''} 
-            onChangeText={(v) => setFilters({ city: v || null })} 
-          />
-
-          <View style={s.buttonRow}>
-            <Button 
-              title="Rechercher" 
-              onPress={run}
-              icon={<Ionicons name="search" size={16} color={colors.white} />}
-              style={s.searchButton}
-            />
-            <Button 
-              title="Géolocalisation" 
-              variant="secondary"
-              onPress={askLocation}
-              icon={<Ionicons name="location" size={16} color={colors.primary} />}
-              style={s.locationButton}
-            />
-          </View>
-
-          {locDenied && (
-            <View style={s.warningContainer}>
-              <Ionicons name="warning" size={16} color={colors.warning} />
-              <Text style={s.warningText}>Géolocalisation refusée - Distance masquée</Text>
             </View>
           )}
-        </Card>
 
-        {/* Results */}
-        <View style={s.resultsSection}>
-          <View style={s.resultsHeader}>
-            <Text style={s.resultsTitle}>
-              Résultats ({results.length})
-            </Text>
-            {location && (
-              <View style={s.locationIndicator}>
-                <Ionicons name="location" size={14} color={colors.success} />
-                <Text style={s.locationText}>Avec distance</Text>
+          {/* Help Section */}
+          {searchQuery.length === 0 && (
+            <View style={s.helpSection}>
+              <Text style={s.helpTitle}>Spécialités disponibles</Text>
+              <View style={s.specialtiesContainer}>
+                {specialties.slice(0, 8).map((specialty, index) => (
+                  <View key={index} style={s.specialtyTag}>
+                    <Text style={s.specialtyText}>{specialty}</Text>
+                  </View>
+                ))}
               </View>
-            )}
-          </View>
-
-          <FlatList
-            data={results}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <DoctoCard
-                doctor={item}
-                distanceKm={location ? distances[item.id] : null}
-                onPress={() => navigation.navigate('DoctorDetails', { id: item.id })}
-              />
-            )}
-            ListEmptyComponent={
-              <Card style={s.emptyCard} variant="filled">
-                <View style={s.emptyContent}>
-                  <Ionicons name="search" size={48} color={colors.textTertiary} />
-                  <Text style={s.emptyTitle}>Aucun médecin trouvé</Text>
-                  <Text style={s.emptySubtitle}>
-                    Essayez de modifier vos critères de recherche
-                  </Text>
-                </View>
-              </Card>
-            }
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={s.listContent}
-          />
-        </View>
-
-        {/* Help Text */}
-        <View style={s.helpSection}>
-          <Text style={s.helpTitle}>Spécialités disponibles</Text>
-          <Text style={s.helpText}>
-            {specialties.slice(0, 5).join(', ')}...
-          </Text>
-          <Text style={s.helpTitle}>Villes disponibles</Text>
-          <Text style={s.helpText}>
-            {cities.join(', ')}
-          </Text>
-        </View>
-      </Animated.View>
-    </View>
+            </View>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -213,117 +181,155 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
   },
   header: {
-    marginBottom: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  title: {
-    ...textStyles.h1,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    ...textStyles.body,
-    color: colors.textSecondary,
-    lineHeight: 24,
-  },
-  filtersCard: {
-    marginBottom: spacing.lg,
-  },
-  filtersHeader: {
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+    alignItems: 'center'
   },
-  filtersTitle: {
-    ...textStyles.h3,
-    color: colors.text,
+  title: { 
+    color: 'white', 
+    fontSize: 18, 
+    fontWeight: '700', 
+    textAlign: 'center', 
+    flex: 1 
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  searchButton: {
-    flex: 1,
-  },
-  locationButton: {
-    flex: 1,
-  },
-  warningContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.warningLight,
-    borderRadius: 8,
-  },
-  warningText: {
-    ...textStyles.caption,
-    color: colors.warning,
-    marginLeft: spacing.xs,
+  searchContainer: {
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   resultsSection: {
-    flex: 1,
+    paddingHorizontal: spacing.lg,
   },
   resultsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: spacing.md,
   },
   resultsTitle: {
     ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.text,
-  },
-  locationIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    ...textStyles.caption,
-    color: colors.success,
-    marginLeft: spacing.xs,
+    letterSpacing: 0.3,
   },
   listContent: {
     paddingBottom: spacing.section,
   },
+  doctorItem: {
+    marginBottom: spacing.md,
+  },
+  doctorCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  doctorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  doctorAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.lg,
+  },
+  doctorInfo: {
+    flex: 1,
+  },
+  doctorName: {
+    ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  doctorSpecialty: {
+    ...textStyles.body,
+    fontSize: 15,
+    color: colors.primary,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
+  doctorLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doctorAddress: {
+    ...textStyles.bodySmall,
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+  },
+  doctorActions: {
+    marginLeft: spacing.md,
+  },
   emptyCard: {
     alignItems: 'center',
     paddingVertical: spacing.section,
+    borderRadius: 16,
+    backgroundColor: colors.backgroundSecondary,
   },
   emptyContent: {
     alignItems: 'center',
   },
   emptyTitle: {
     ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.textSecondary,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
   emptySubtitle: {
     ...textStyles.bodySmall,
+    fontSize: 14,
     color: colors.textTertiary,
     textAlign: 'center',
+    lineHeight: 20,
   },
   helpSection: {
+    paddingHorizontal: spacing.lg,
     marginTop: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingBottom: spacing.section,
   },
   helpTitle: {
-    ...textStyles.caption,
-    color: colors.textSecondary,
+    ...textStyles.h3,
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: spacing.xs,
+    color: colors.text,
+    marginBottom: spacing.md,
+    letterSpacing: 0.3,
   },
-  helpText: {
-    ...textStyles.caption,
-    color: colors.textTertiary,
-    marginBottom: spacing.sm,
+  specialtiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  specialtyTag: {
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+  },
+  specialtyText: {
+    ...textStyles.bodySmall,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.primary,
   },
 });

@@ -2,7 +2,6 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabs from './MainTabs';
 import AuthStack from './AuthStack';
-import DoctorDetailsScreen from '../app/doctor/DoctorDetailsScreen';
 import BookingStack from './BookingStack';
 import HeaderGradient from './HeaderGradient';
 import useAuthStore from '../stores/auth.store';
@@ -19,8 +18,7 @@ export default function RootNavigator() {
     >
       <Stack.Screen name="Auth" component={AuthStack} options={{ headerShown: false }} />
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="DoctorDetails" component={DoctorDetailsScreen} options={{ title: 'Médecin' }} />
-      <Stack.Screen name="Booking" component={BookingStack} options={{ headerShown: false }} />
+      <Stack.Screen name="BookingStack" component={BookingStack} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

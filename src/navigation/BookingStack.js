@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CalendarScreen from '../app/booking/CalendarScreen';
-import SlotsScreen from '../app/booking/SlotsScreen';
+import DoctorDetailsScreen from '../app/doctor/DoctorDetailsScreen';
+import BookingScreen from '../app/booking/BookingScreen';
 import HeaderGradient from './HeaderGradient';
 
 const Stack = createNativeStackNavigator();
@@ -9,8 +9,16 @@ const Stack = createNativeStackNavigator();
 export default function BookingStack() {
   return (
     <Stack.Navigator screenOptions={{ header: (p) => <HeaderGradient {...p} /> }}>
-      <Stack.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendrier' }} />
-      <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Créneaux' }} />
+      <Stack.Screen 
+        name="DoctorDetails" 
+        component={DoctorDetailsScreen} 
+        options={{ title: 'Détails du médecin' }} 
+      />
+      <Stack.Screen 
+        name="Booking" 
+        component={BookingScreen} 
+        options={{ title: 'Prendre rendez-vous' }} 
+      />
     </Stack.Navigator>
   );
 }

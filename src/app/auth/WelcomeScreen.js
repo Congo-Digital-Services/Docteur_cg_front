@@ -1,21 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Dimensions, Animated, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
 import { t } from '../../i18n';
 import { spacing } from '../../theme/spacing';
 import colors from '../../theme/colors';
 import { radius } from '../../theme/radius';
-import { fontSizes, fontWeights } from '../../theme/typography';
+import { textStyles } from '../../theme/typography';
 
 const { height, width } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }) {
-  // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideUpAnim = useRef(new Animated.Value(50)).current;
-  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
-  const cardsAnim = useRef(new Animated.Value(0)).current;
+  // Animations fluides et progressives
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const headerSlideAnim = useRef(new Animated.Value(-30)).current;
+  const logoScaleAnim = useRef(new Animated.Value(0.7)).current;
+  const titleFadeAnim = useRef(new Animated.Value(0)).current;
+  const titleSlideAnim = useRef(new Animated.Value(20)).current;
+  const subtitleFadeAnim = useRef(new Animated.Value(0)).current;
+  const featuresFadeAnim = useRef(new Animated.Value(0)).current;
+  const featuresSlideAnim = useRef(new Animated.Value(30)).current;
+  const buttonsFadeAnim = useRef(new Animated.Value(0)).current;
+  const buttonsSlideAnim = useRef(new Animated.Value(40)).current;
 
   // Loading states
   const [loginLoading, setLoginLoading] = useState(false);
@@ -23,31 +30,82 @@ export default function WelcomeScreen({ navigation }) {
   const [guestLoading, setGuestLoading] = useState(false);
 
   useEffect(() => {
-    // Animation d'entrée
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideUpAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(logoScaleAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardsAnim, {
-        toValue: 1,
-        duration: 1000,
-        delay: 400,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Séquence d'animations fluides et progressives
+    const animationSequence = Animated.sequence([
+      // 1. Header et logo (0-600ms)
+      Animated.parallel([
+        Animated.timing(headerFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(headerSlideAnim, {
+          toValue: 0,
+          tension: 80,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScaleAnim, {
+          toValue: 1,
+          tension: 60,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]),
+      
+      // 2. Titre et sous-titre (600-1000ms)
+      Animated.parallel([
+        Animated.timing(titleFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(titleSlideAnim, {
+          toValue: 0,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.timing(subtitleFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          delay: 100,
+          useNativeDriver: true,
+        }),
+      ]),
+      
+      // 3. Features (1000-1300ms)
+      Animated.parallel([
+        Animated.timing(featuresFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(featuresSlideAnim, {
+          toValue: 0,
+          tension: 80,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+      
+      // 4. Boutons (1300-1600ms)
+      Animated.parallel([
+        Animated.timing(buttonsFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(buttonsSlideAnim, {
+          toValue: 0,
+          tension: 60,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    animationSequence.start();
   }, []);
 
   const handleLogin = async () => {
@@ -79,90 +137,135 @@ export default function WelcomeScreen({ navigation }) {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
       
-      {/* Hero Section with Gradient */}
+      {/* Section principale avec gradient - tout en un */}
       <LinearGradient
-        colors={['#1E40AF', '#3B82F6', '#60A5FA']}
-        style={s.heroSection}
+        colors={[colors.primaryDark, colors.primary, colors.primaryLight]}
+        style={s.mainGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
+        {/* Header Section - Positionné en haut dès le début */}
         <Animated.View 
           style={[
-            s.heroContent,
+            s.headerSection,
             {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideUpAnim }]
+              opacity: headerFadeAnim,
+              transform: [{ translateY: headerSlideAnim }]
             }
           ]}
         >
+          {/* Logo avec animation de rotation subtile */}
           <Animated.View 
             style={[
               s.logoContainer,
-              { transform: [{ scale: logoScaleAnim }] }
+              { 
+                transform: [
+                  { scale: logoScaleAnim }
+                ]
+              }
             ]}
           >
-            <Text style={s.logoText}>DOKOTA</Text>
+            <View style={s.logoIconContainer}>
+              <Ionicons name="medical" size={32} color="white" />
+            </View>
+            <Text style={s.logoText}>Docteur CG</Text>
             <View style={s.logoAccent} />
           </Animated.View>
           
-          <View style={s.heroText}>
-            <Text style={s.heroTitle}>Votre santé,</Text>
-            <Text style={s.heroTitleAccent}>simplifiée</Text>
-          </View>
+          {/* Titre principal avec animation séparée */}
+          <Animated.View 
+            style={[
+              s.titleContainer,
+              {
+                opacity: titleFadeAnim,
+                transform: [{ translateY: titleSlideAnim }]
+              }
+            ]}
+          >
+            <Text style={s.mainTitle}>Bienvenue</Text>
+            <Text style={s.subTitle}>Votre santé, simplifiée</Text>
+          </Animated.View>
           
-          <Text style={s.heroSubtitle}>
-            Trouvez des médecins près de vous en quelques clics
-          </Text>
+          {/* Sous-titre avec délai */}
+          <Animated.View 
+            style={[
+              s.subtitleContainer,
+              {
+                opacity: subtitleFadeAnim,
+              }
+            ]}
+          >
+            <Text style={s.descriptionText}>
+              Trouvez des médecins près de vous et prenez rendez-vous en quelques clics
+            </Text>
+          </Animated.View>
         </Animated.View>
-        
-        {/* Simple Feature Points */}
+
+        {/* Features Section - collé au header */}
         <Animated.View 
           style={[
-            s.featuresContainer,
+            s.featuresSection,
             {
-              opacity: cardsAnim,
-              transform: [{ translateY: Animated.multiply(cardsAnim, 20) }]
+              opacity: featuresFadeAnim,
+              transform: [{ translateY: featuresSlideAnim }]
             }
           ]}
         >
-          <View style={s.featureRow}>
-            <View style={s.featureDot} />
-            <Text style={s.featureText}>Prenez rendez-vous en quelques clics</Text>
-          </View>
-          <View style={s.featureRow}>
-            <View style={s.featureDot} />
-            <Text style={s.featureText}>Trouvez des médecins près de vous</Text>
+          <View style={s.featuresContainer}>
+            <View style={s.featureItem}>
+              <View style={s.featureIconContainer}>
+                <Ionicons name="calendar" size={20} color="white" />
+              </View>
+              <Text style={s.featureText}>Prenez rendez-vous facilement</Text>
+            </View>
+            <View style={s.featureItem}>
+              <View style={s.featureIconContainer}>
+                <Ionicons name="location" size={20} color="white" />
+              </View>
+              <Text style={s.featureText}>Trouvez des médecins près de vous</Text>
+            </View>
+            <View style={s.featureItem}>
+              <View style={s.featureIconContainer}>
+                <Ionicons name="shield-checkmark" size={20} color="white" />
+              </View>
+              <Text style={s.featureText}>Sécurisé et fiable</Text>
+            </View>
           </View>
         </Animated.View>
       </LinearGradient>
 
-      {/* Bottom Section */}
+      {/* Bottom Section avec boutons - séparé pour être visible */}
       <Animated.View 
         style={[
           s.bottomSection,
           {
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(slideUpAnim, -1) }]
+            opacity: buttonsFadeAnim,
+            transform: [{ translateY: buttonsSlideAnim }]
           }
         ]}
       >
         <View style={s.buttonContainer}>
           <Button 
-            title="Commencer maintenant" 
+            title="Se connecter" 
             onPress={handleLogin}
             loading={loginLoading}
             disabled={loginLoading || signupLoading || guestLoading}
+            size="large"
+            fullWidth
             style={s.primaryButton}
+            //icon={<Ionicons name="arrow-forward" size={20} color={colors.white} />}
           />
           <Button 
-            title="J'ai déjà un compte" 
+            title="S'inscrire" 
             variant="secondary" 
             onPress={handleSignup}
             loading={signupLoading}
             disabled={loginLoading || signupLoading || guestLoading}
+            fullWidth
             style={s.secondaryButton}
+            icon={<Ionicons name="log-in" size={20} color={colors.primary} />}
           />
           <Button 
             title="Explorer sans compte" 
@@ -170,7 +273,9 @@ export default function WelcomeScreen({ navigation }) {
             onPress={handleGuest}
             loading={guestLoading}
             disabled={loginLoading || signupLoading || guestLoading}
+            fullWidth
             style={s.tertiaryButton}
+            //icon={<Ionicons name="eye" size={20} color={colors.textSecondary} />}
           />
         </View>
       </Animated.View>
@@ -181,119 +286,162 @@ export default function WelcomeScreen({ navigation }) {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.background,
   },
-  heroSection: {
-    flex: 0.7,
-    paddingTop: spacing.xl * 2,
-    paddingHorizontal: spacing.xl,
-    justifyContent: 'space-between',
+  
+  // Section principale avec gradient
+  mainGradient: {
+    flex: 3, // TRÈS grand
+    justifyContent: 'flex-start', // Commence en haut
+    height: '80%', // Force la hauteur à 80% de l'écran
   },
-  heroContent: {
+  
+  // Header Section - Positionné en haut dès le début
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30, // Safe area pour iOS
+    paddingHorizontal: 0, // Supprimé pour maximiser la largeur
+    paddingBottom: spacing.xxxl, // Beaucoup plus d'espace en bas
     alignItems: 'center',
+    width: '100%', // Prend toute la largeur
+    height: '70%', // Force la hauteur à 70% de l'écran
+    justifyContent: 'center', // Centre le contenu verticalement
   },
+  
+  // Logo avec icône
   logoContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xl * 2,
-    position: 'relative',
+    marginBottom: spacing.xl, // Plus d'espace
+  },
+  logoIconContainer: {
+    width: 100, // Plus grand
+    height: 100, // Plus grand
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg, // Plus d'espace
+    shadowColor: 'rgba(0,0,0,0.2)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   logoText: {
-    fontSize: 36,
-    fontWeight: '800',
+    ...textStyles.hero,
     color: 'white',
-    letterSpacing: 3,
-    textShadowColor: 'rgba(0,0,0,0.1)',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.2)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   logoAccent: {
-    width: 40,
+    width: 50,
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.8)',
     borderRadius: 2,
     marginTop: spacing.sm,
   },
-  heroText: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: 'white',
-    textAlign: 'center',
-    lineHeight: 34,
-  },
-  heroTitleAccent: {
-    fontSize: 28,
-    fontWeight: '300',
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: 280,
-    fontWeight: '400',
-  },
-  featuresContainer: {
-    alignItems: 'center',
-    paddingBottom: spacing.xl,
-  },
-  featureRow: {
-    flexDirection: 'row',
+  
+  // Titre principal
+  titleContainer: {
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  featureDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+  mainTitle: {
+    ...textStyles.h1,
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  subTitle: {
+    ...textStyles.h2,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    fontWeight: '300',
+  },
+  
+  // Description
+  subtitleContainer: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  descriptionText: {
+    ...textStyles.body,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 300,
+  },
+  
+  // Features Section - collé au header, dans le gradient
+  featuresSection: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  featuresContainer: {
+    alignItems: 'center',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  featureIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: spacing.md,
   },
   featureText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontWeight: '400',
+    ...textStyles.body,
+    color: 'white',
+    flex: 1,
+    fontWeight: '500',
   },
+  
+  // Bottom Section - séparé pour être visible
   bottomSection: {
-    flex: 0.3,
-    backgroundColor: 'white',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    shadowColor: '#000',
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 40 : spacing.lg, // Safe area bottom
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
   },
   buttonContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    gap: spacing.lg, // Plus d'espace entre les boutons
+    paddingHorizontal: 0, // Supprimé pour maximiser la largeur
+    width: '100%', // Prend toute la largeur disponible
   },
   primaryButton: {
-    marginBottom: spacing.md,
-    backgroundColor: '#1E40AF',
-    shadowColor: '#1E40AF',
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
-    minHeight: 56,
+    paddingVertical: spacing.lg, // Plus de hauteur
+    borderRadius: 16, // Coins plus arrondis
   },
   secondaryButton: {
-    marginBottom: spacing.md,
-    backgroundColor: 'white',
-    borderColor: '#E2E8F0',
+    backgroundColor: colors.white,
+    borderColor: colors.border,
     borderWidth: 2,
-    minHeight: 56,
+    paddingVertical: spacing.lg, // Plus de hauteur
+    borderRadius: 16, // Coins plus arrondis
   },
   tertiaryButton: {
     backgroundColor: 'transparent',
     borderWidth: 0,
-    minHeight: 48,
   },
 });
