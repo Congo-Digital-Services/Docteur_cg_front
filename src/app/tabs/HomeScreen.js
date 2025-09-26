@@ -1,20 +1,25 @@
 // src/app/tabs/HomeScreen.jsx
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Pressable, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useThemeMode } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import colors from '../../theme/colors';   // ← palette centrale (aucune couleur en dur)
 import { textStyles } from '../../theme/typography';
+import useAuthStore from '../../stores/auth.store';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
   const { toggle, mode } = useThemeMode();
+  const { token, simulateLogin, logout } = useAuthStore();
 
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(16)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const waveAnimation = useRef(new Animated.Value(0)).current;
   const cardAnimations = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -30,6 +35,7 @@ export default function HomeScreen({ navigation }) {
       Animated.timing(slide, { toValue: 0, duration: 600, useNativeDriver: true }),
     ]).start();
 
+
     // Animations échelonnées des cartes
     cardAnimations.forEach((anim, index) => {
       Animated.timing(anim, {
@@ -41,50 +47,174 @@ export default function HomeScreen({ navigation }) {
     });
   }, []);
 
+  // Animation de couleur
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(waveAnimation, { toValue: 1, duration: 3000, useNativeDriver: false }),
+        Animated.timing(waveAnimation, { toValue: 0, duration: 3000, useNativeDriver: false }),
+      ])
+    ).start();
+  }, []);
+
+  // Animations pour le header collapsant
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [350, 60],
+    extrapolate: 'clamp',
+  });
+
+  const heroContentOpacity = scrollY.interpolate({
+    inputRange: [0, 120],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const heroContentScale = scrollY.interpolate({
+    inputRange: [0, 120],
+    outputRange: [1, 0.9],
+    extrapolate: 'clamp',
+  });
+
+  const headerTopBarOpacity = scrollY.interpolate({
+    inputRange: [0, 120],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const gradientOpacity = scrollY.interpolate({
+    inputRange: [0, 120],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+
   return (
-    <ScrollView
-      style={[s.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: spacing.section }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* HEADER HERO */}
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.hero}
-      >
-        <View style={s.heroTopBar}>
-          <View style={s.logoContainer}>
-            <Text style={s.logoText}>Docteur CG</Text>
-          </View>
-          <Pressable onPress={() => navigation.navigate('Login')}>
-            <Text style={[s.linkLight, textStyles.medium]}>Se connecter</Text>
-          </Pressable>
+    <View style={s.container}>
+      {/* HEADER FIXE COLLAPSANT */}
+      <Animated.View style={[
+        s.fixedHeader,
+        { height: headerHeight }
+      ]}>
+        <View style={[
+          s.hero,
+          { backgroundColor: colors.primary }
+        ]}>
+          <Animated.View style={[
+            StyleSheet.absoluteFillObject,
+            { opacity: gradientOpacity }
+          ]}>
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </Animated.View>
+          <Animated.View style={[
+            s.heroTopBar,
+            { opacity: headerTopBarOpacity }
+          ]}>
+            <View style={s.logoContainer}>
+              <Text style={s.logoText}>Docteur CG</Text>
+            </View>
+            {!token && (
+              <Pressable onPress={() => navigation.navigate('Login')} style={s.connectButton}>
+                <Text style={s.connectButtonText}>Se connecter</Text>
+              </Pressable>
+            )}
+          </Animated.View>
+
+          <Animated.View style={[
+            s.heroContent,
+            {
+              opacity: heroContentOpacity,
+              transform: [{ scale: heroContentScale }]
+            }
+          ]}>
+            <View style={s.heroTextContainer}>
+              <Text style={[s.heroTitle, { color: colors.textInverse }]}>
+                Votre santé,{'\n'}notre <Text style={s.heroTitleAccent}>priorité</Text>
+              </Text>
+              <Text style={s.heroSubtitle}>
+                Trouvez rapidement le professionnel de santé qu'il vous faut
+              </Text>
+            </View>
+            
+            <View style={s.heroImageContainer}>
+              <View style={s.medicalIcon}>
+                <Ionicons name="medical" size={40} color="white" />
+              </View>
+            </View>
+          </Animated.View>
         </View>
+        
+        {/* Courbe avec opacité */}
+        <View style={[s.wave, { opacity: 1 }]}>
+          <Svg viewBox="0 0 375 80" preserveAspectRatio="none">
+            <Path
+              d="M0,80 L0,0 Q187.5,70 375,0 L375,80 Z"
+              fill={colors.primary}
+            />
+          </Svg>
+        </View>
+      </Animated.View>
 
-        <Text style={[s.heroTitle, { color: colors.textInverse }]}>
-          Vivez{'\n'}en <Text style={s.heroTitleAccent}>meilleure santé</Text>
-        </Text>
-
-        {/* Barre "Rechercher" (pill) */}
-        <Pressable onPress={() => navigation.navigate('Search')} style={s.searchPill}>
-          <Ionicons name="search" size={18} color={colors.primary} />
-          <Text style={[s.searchPillText, { color: colors.primary }]}>RECHERCHER</Text>
-        </Pressable>
-      </LinearGradient>
+      <ScrollView
+        style={[s.scrollView, { backgroundColor: colors.background }]}
+        contentContainerStyle={{ 
+          paddingBottom: spacing.section,
+          paddingTop: 350 // Espace pour le header fixe
+        }}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        bounces={true}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+      >
 
       <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
-        {/* CARTE INFO */}
-        <InfoCard
-          title="Besoin d'un rendez-vous médical ? Trouvez le professionnel de santé adapté à vos besoins"
-          onPress={() => navigation.navigate('Search')}
-        />
+        {/* CARTE PRINCIPALE MODERNE */}
+        <View style={s.mainContentContainer}>
+          <ModernInfoCard
+            title="Trouvez le professionnel de santé qu'il vous faut"
+            subtitle="Plus de 500 médecins disponibles dans toute la République du Congo"
+            onPress={() => navigation.navigate('Search')}
+          />
 
-        {/* CTA soignant */}
-        <Pressable onPress={() => {}} style={[s.ctaDark, { backgroundColor: colors.ctaDark }]}>
-          <Text style={[s.ctaDarkText, textStyles.semibold]}>{`Vous êtes soignant ?`}</Text>
-        </Pressable>
+          {/* SECTION AVANTAGES MODERNE */}
+          <View style={s.advantagesSection}>
+            <Text style={s.sectionTitle}>Pourquoi choisir Docteur CG ?</Text>
+            <View style={s.advantagesGrid}>
+              <AdvantageCard
+                icon="shield-checkmark"
+                title="Sécurisé"
+                desc="Vos données sont protégées"
+                color={colors.primary}
+                bgColor={colors.primaryMuted}
+              />
+              <AdvantageCard
+                icon="time"
+                title="Rapide"
+                desc="Réservation en quelques clics"
+                color={colors.primary}
+                bgColor={colors.primaryMuted}
+              />
+              <AdvantageCard
+                icon="location"
+                title="Partout"
+                desc="Dans tout le Congo"
+                color={colors.primary}
+                bgColor={colors.primaryMuted}
+              />
+            </View>
+          </View>
+        </View>
+
 
         {/* SECTION AVANTAGES */}
         <Text style={[s.sectionTitle, { color: colors.text }]}>Votre compagnon de santé au quotidien</Text>
@@ -116,63 +246,54 @@ export default function HomeScreen({ navigation }) {
             { opacity: cardAnimations[2], transform: [{ translateY: cardAnimations[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }
           ]}>
             <FeatureCard
-              icon="time"
-              title="Disponibilité 24h/24"
-              desc="Recherchez et réservez vos rendez-vous à tout moment, même en dehors des heures d'ouverture."
-              color="#DC2626"
-              bgColor="#FEE2E2"
+              icon="location"
+              title="Partout au Congo"
+              desc="Trouvez des médecins dans toutes les régions de la République du Congo."
+              color="#7C3AED"
+              bgColor="#F3E8FF"
             />
           </Animated.View>
         </View>
 
-        {/* Actions rapides colorées */}
-        <View style={s.quickRow}>
-          <QuickActionColor
-            icon="search"
-            label="Rechercher"
-            color="#1E40AF"
-            bgColor="#DBEAFE"
-            onPress={() => navigation.navigate('Search')}
-          />
-          <QuickActionColor
-            icon="calendar"
-            label="Rendez-vous"
-            color="#059669"
-            bgColor="#D1FAE5"
-            onPress={() => navigation.navigate('Appointments')}
-          />
-          <QuickActionColor
-            icon="call"
-            label="Urgences"
-            color="#DC2626"
-            bgColor="#FEE2E2"
-            onPress={() => {}}
-          />
-        </View>
 
-        {/* Section statistiques */}
-        <StatsCard />
       </Animated.View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-/* —————— Sub-components (simples, réutilisables) —————— */
+/* —————— Nouveaux composants modernes —————— */
 
-function InfoCard({ title, onPress }) {
+function ModernInfoCard({ title, subtitle, onPress }) {
   return (
-    <Pressable onPress={onPress} style={[s.card, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
-      <View style={s.cardRow}>
-        <View style={{ flex: 1, paddingRight: spacing.md }}>
-          <Text style={[s.cardTitle, { color: colors.text }]}>{title}</Text>
+    <Pressable onPress={onPress} style={s.modernInfoCard}>
+      <View style={s.modernInfoContent}>
+        <View style={s.modernInfoText}>
+          <Text style={s.modernInfoTitle}>{title}</Text>
+          <Text style={s.modernInfoSubtitle}>{subtitle}</Text>
         </View>
-        <View style={[s.illust, { backgroundColor: colors.primaryMuted }]}>
-          <Ionicons name="medical" size={28} color={colors.primary} />
+        <View style={s.modernInfoIcon}>
+          <Ionicons name="arrow-forward" size={24} color={colors.primary} />
         </View>
       </View>
     </Pressable>
   );
 }
+
+function AdvantageCard({ icon, title, desc, color, bgColor }) {
+  return (
+    <View style={s.advantageCard}>
+      <View style={[s.advantageIcon, { backgroundColor: bgColor }]}>
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
+      <Text style={s.advantageTitle}>{title}</Text>
+      <Text style={s.advantageDesc}>{desc}</Text>
+    </View>
+  );
+}
+
+
+
 
 function FeatureItem({ icon, title, desc }) {
   return (
@@ -240,34 +361,99 @@ function StatsCard() {
 const s = StyleSheet.create({
   container: { flex: 1 },
 
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    overflow: 'hidden',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  // Hero section moderne
+  heroContainer: {
+    position: 'relative',
+  },
   hero: {
-    paddingTop: spacing.xxxl, // Beaucoup plus d'espace en haut
-    paddingBottom: spacing.xxxl, // Beaucoup plus d'espace en bas
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.xxxl,
     paddingHorizontal: spacing.lg,
+    height: '100%',
+  },
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.lg,
-    minHeight: 200, // Hauteur minimale garantie
+  },
+  heroTextContainer: {
+    flex: 1,
+    paddingRight: spacing.md,
+  },
+  heroImageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medicalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    lineHeight: 22,
+    marginTop: spacing.sm,
+    fontWeight: '400',
+  },
+  
+  wave: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+  mainContentContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  advantagesSection: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  advantagesGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+    gap: spacing.sm,
   },
   heroTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xl, // Plus d'espace
-    paddingVertical: spacing.md, // Plus d'espace vertical
+    marginBottom: spacing.lg,
+    paddingTop: spacing.xl,
   },
-  roundBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+  connectButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  linkLight: { 
-    color: colors.textInverse,
-    fontSize: 16,
+  connectButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    letterSpacing: 0.5,
   },
 
   heroTitle: {
@@ -282,56 +468,133 @@ const s = StyleSheet.create({
   },
   searchPill: {
     alignSelf: 'center',
-    minWidth: width * 0.5,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
+    minWidth: width * 0.6,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 25,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.xs,
-    // Pas d'ombre pour un look plus clean
+    gap: spacing.sm,
+    backgroundColor: 'white',
   },
   searchPillText: {
     ...textStyles.semibold,
-    fontSize: 13,
+    fontSize: 16,
     letterSpacing: 0.5,
   },
 
-  card: {
+  // Carte info moderne
+  modernInfoCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
-    borderRadius: 16,
-    padding: spacing.md,
-    // ombre légère
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
+    borderRadius: 20,
+    padding: spacing.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  cardTitle: { 
-    ...textStyles.semibold, 
-    fontSize: 16, 
-    lineHeight: 22,
-    fontWeight: '600',
-  },
-  illust: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  modernInfoContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+  },
+  modernInfoText: {
+    flex: 1,
+    paddingRight: spacing.md,
+  },
+  modernInfoTitle: {
+    ...textStyles.bold,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.xs,
+    lineHeight: 24,
+  },
+  modernInfoSubtitle: {
+    ...textStyles.body,
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  modernInfoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  ctaDark: {
-    alignSelf: 'center',
-    paddingVertical: spacing.sm,
+  // Animation de couleur
+  colorAnimationSection: {
     paddingHorizontal: spacing.lg,
-    borderRadius: 10,
     marginBottom: spacing.xl,
   },
-  ctaDarkText: { color: colors.textInverse },
+  colorAnimationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+  },
+  colorBar: {
+    width: 60,
+    height: 4,
+    borderRadius: 2,
+  },
+
+  // Section avantages
+  advantagesSection: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  advantagesGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  advantageCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  advantageIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  advantageTitle: {
+    ...textStyles.semibold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  advantageDesc: {
+    ...textStyles.body,
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 
   sectionTitle: {
     ...textStyles.bold,
@@ -340,6 +603,7 @@ const s = StyleSheet.create({
     fontWeight: '700',
     marginBottom: spacing.lg,
     letterSpacing: 0.5,
+    color: colors.text,
   },
 
   featureItem: {
@@ -369,31 +633,6 @@ const s = StyleSheet.create({
     fontWeight: '400',
   },
 
-  quickRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  quickItem: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 16,
-    minWidth: 92,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickLabel: { 
-    ...textStyles.medium, 
-    fontSize: 13, 
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
 
   // Styles pour les nouveaux composants colorés
   heroTitleAccent: {
@@ -465,44 +704,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  statsCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: 16,
-    padding: spacing.lg,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  statsTitle: {
-    ...textStyles.bold,
-    fontSize: 19,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-    letterSpacing: 0.5,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    ...textStyles.bold,
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  statLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    letterSpacing: 0.2,
-  },
 
   // Styles pour le logo et le bouton recherche
   logoContainer: {

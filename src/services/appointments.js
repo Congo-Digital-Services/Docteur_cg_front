@@ -1,11 +1,25 @@
 import { delay } from '../utils/delay';
 import baseAppointments from '../mocks/appointments.json';
+import baseDoctors from '../mocks/doctors.json';
+import baseSlots from '../mocks/slots.json';
 
 let appts = [...baseAppointments]; // in-memory
 
 export async function getMyAppointments() {
   await delay(400);
-  return appts;
+  
+  // Enrichir les rendez-vous avec les données du médecin et du créneau
+  return appts.map(appointment => {
+    const doctor = baseDoctors.find(d => d.id === appointment.doctorId);
+    const slot = baseSlots.find(s => s.id === appointment.slotId);
+    
+    return {
+      ...appointment,
+      doctor,
+      date: slot?.date || '2024-01-15',
+      time: slot?.time || '10:00'
+    };
+  });
 }
 
 export async function createAppointment({ doctorId, slotId }) {

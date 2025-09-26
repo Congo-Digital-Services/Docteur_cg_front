@@ -4,6 +4,7 @@ export default {
   primaryLight: '#3B82F6',
   primaryDark: '#1D4ED8',
   primaryMuted: '#EFF6FF',
+  primaryDeep: '#1E40AF', // Bleu foncé pour les headers
   
   // Couleurs secondaires
   secondary: '#64748B',

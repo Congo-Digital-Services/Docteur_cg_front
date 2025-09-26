@@ -1,19 +1,27 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, Animated, Pressable } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, Animated, Pressable, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, G, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 
 import useBookingStore from '../../stores/booking.store';
 import useAuthStore from '../../stores/auth.store';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import HeaderGradient from '../../navigation/HeaderGradient';
 import { colors, spacing, radius, textStyles } from '../../theme';
 
 export default function AppointmentsScreen({ navigation }) {
   const { appointments, loadMine, cancel } = useBookingStore();
   const { user, token } = useAuthStore();
-  const insets = useSafeAreaInsets();
+  
+  // États pour la pagination et suppression
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedAppointments, setSelectedAppointments] = useState([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState(null);
+  
+  const ITEMS_PER_PAGE = 10;
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -43,8 +51,54 @@ export default function AppointmentsScreen({ navigation }) {
     navigation.navigate('Auth', { screen: 'Login' });
   };
 
-  const handleCancelAppointment = (appointmentId) => {
-    cancel(appointmentId);
+  // Calcul de la pagination
+  const totalPages = Math.ceil(appointments.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedAppointments = appointments.slice(startIndex, endIndex);
+
+  // Fonctions de gestion
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleLongPress = (appointment) => {
+    setIsSelectionMode(true);
+    toggleSelection(appointment.id);
+  };
+
+  const confirmDelete = () => {
+    if (appointmentToDelete) {
+      cancel(appointmentToDelete.id);
+      setDeleteModalVisible(false);
+      setAppointmentToDelete(null);
+    }
+  };
+
+  const toggleSelection = (appointmentId) => {
+    setSelectedAppointments(prev => 
+      prev.includes(appointmentId) 
+        ? prev.filter(id => id !== appointmentId)
+        : [...prev, appointmentId]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedAppointments.length > 0) {
+      setDeleteModalVisible(true);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    selectedAppointments.forEach(id => cancel(id));
+    setSelectedAppointments([]);
+    setIsSelectionMode(false);
+    setDeleteModalVisible(false);
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedAppointments([]);
   };
 
   const getStatusColor = (status) => {
@@ -65,37 +119,144 @@ export default function AppointmentsScreen({ navigation }) {
     }
   };
 
-  const renderAppointmentItem = ({ item }) => (
-    <Card style={s.appointmentCard} elevation="low">
-      <View style={s.appointmentContent}>
-        <View style={s.appointmentHeader}>
-          <View style={s.appointmentIcon}>
-            <Ionicons name="calendar" size={20} color={colors.primary} />
+  const renderAppointmentItem = ({ item }) => {
+    const isSelected = selectedAppointments.includes(item.id);
+
+    const handleCardPress = () => {
+      if (isSelectionMode) {
+        toggleSelection(item.id);
+      } else {
+        // Navigation vers les détails du rendez-vous
+        navigation.navigate('BookingStack', {
+          screen: 'AppointmentDetails',
+          params: { appointment: item }
+        });
+      }
+    };
+
+  return (
+      <Pressable
+        onLongPress={() => handleLongPress(item)}
+        onPress={handleCardPress}
+        style={[
+          s.appointmentCard,
+          isSelected && s.selectedCard
+        ]}
+      >
+          <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View style={s.doctorInfo}>
+              <View style={s.doctorAvatar}>
+                <Text style={s.doctorInitial}>
+                  {(item.doctor?.lastName || 'D').charAt(0)}
+                </Text>
+              </View>
+              <View style={s.doctorDetails}>
+                <Text style={s.doctorName}>
+                  {item.doctor?.title || 'Dr'} {item.doctor?.lastName || 'Nom non disponible'}
+                </Text>
+                <Text style={s.doctorSpecialty}>
+                  {item.doctor?.specialty || 'Spécialité non disponible'}
+                </Text>
+              </View>
+            </View>
+            
+            {isSelectionMode && (
+              <View style={s.selectionIndicator}>
+                <View style={[s.checkbox, isSelected && s.checkboxSelected]}>
+                  {isSelected && <Ionicons name="checkmark" size={16} color="white" />}
+                </View>
+              </View>
+            )}
           </View>
-          <View style={s.appointmentInfo}>
-            <Text style={s.appointmentTitle}>Rendez-vous #{item.id}</Text>
-            <Text style={s.appointmentDate}>Slot: {item.slotId}</Text>
+
+          <View style={s.appointmentDetails}>
+            <View style={s.detailRow}>
+              <View style={s.detailIcon}>
+                <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+              </View>
+              <Text style={s.detailText}>
+                {new Date(item.date).toLocaleDateString('fr-FR', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short'
+                })}
+              </Text>
+            </View>
+            
+            <View style={s.detailRow}>
+              <View style={s.detailIcon}>
+                <Ionicons name="time-outline" size={16} color={colors.primary} />
+              </View>
+              <Text style={s.detailText}>{item.time}</Text>
+            </View>
           </View>
-          <View style={[s.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-            <Text style={[s.statusText, { color: getStatusColor(item.status) }]}>
-              {getStatusText(item.status)}
-            </Text>
+
+          <View style={s.cardFooter}>
+            <View style={[s.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+              <Text style={s.statusText}>
+                {getStatusText(item.status)}
+              </Text>
+            </View>
           </View>
         </View>
-        
-        {item.status !== 'DECLINED' && (
-          <View style={s.appointmentActions}>
-            <Button 
-              title="Annuler" 
-              variant="secondary" 
-              size="small"
-              onPress={() => handleCancelAppointment(item.id)} 
-            />
-          </View>
-        )}
+      </Pressable>
+    );
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={s.paginationContainer}>
+        <Pressable
+          style={[s.paginationButton, currentPage === 1 && s.paginationButtonDisabled]}
+          onPress={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? colors.textTertiary : colors.primary} />
+        </Pressable>
+
+        <View style={s.paginationInfo}>
+          <Text style={s.paginationText}>
+            Page {currentPage} sur {totalPages}
+          </Text>
+        </View>
+
+        <Pressable
+          style={[s.paginationButton, currentPage === totalPages && s.paginationButtonDisabled]}
+          onPress={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          <Ionicons name="chevron-forward" size={20} color={currentPage === totalPages ? colors.textTertiary : colors.primary} />
+        </Pressable>
       </View>
-    </Card>
-  );
+    );
+  };
+
+  const renderSelectionToolbar = () => {
+    if (!isSelectionMode) return null;
+
+    return (
+      <View style={s.selectionToolbar}>
+        <Pressable style={s.toolbarButton} onPress={exitSelectionMode}>
+          <Ionicons name="close" size={20} color={colors.textSecondary} />
+        </Pressable>
+
+        <Text style={s.selectionCount}>
+          {selectedAppointments.length} sélectionné{selectedAppointments.length > 1 ? 's' : ''}
+        </Text>
+
+        <Pressable 
+          style={[s.toolbarButton, selectedAppointments.length === 0 && s.toolbarButtonDisabled]} 
+          onPress={handleBulkDelete}
+          disabled={selectedAppointments.length === 0}
+        >
+          <Ionicons name="trash-outline" size={20} color={selectedAppointments.length === 0 ? colors.textTertiary : colors.error} />
+        </Pressable>
+      </View>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={s.emptyContainer}>
@@ -114,33 +275,45 @@ export default function AppointmentsScreen({ navigation }) {
     </View>
   );
 
-  const renderGuestState = () => (
-    <View style={s.guestContainer}>
-      <View style={s.guestIcon}>
-        <Ionicons name="person-outline" size={64} color={colors.textTertiary} />
-      </View>
-      <Text style={s.guestTitle}>Connectez-vous</Text>
-      <Text style={s.guestSubtitle}>
-        Connectez-vous pour voir vos rendez-vous et gérer votre planning
-      </Text>
-      <Button 
-        title="Se connecter" 
-        onPress={handleLoginPress}
-        style={s.guestButton}
-      />
-    </View>
-  );
+         const renderGuestState = () => (
+           <View style={s.guestContainer}>
+             <View style={s.calendarIconContainer}>
+               <Svg width="80" height="80" viewBox="0 0 128 128" fill="none">
+                 {/* Calendrier arrière (plus bas + un peu à droite) */}
+                 <Rect x="48" y="48" width="72" height="76" rx="4" fill="#1976D2"/>
+                 <Rect x="48" y="48" width="72" height="20" fill="#0D47A1"/>
+                 <Rect x="60" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+                 <Rect x="88" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+                 
+                 {/* Calendrier avant */}
+                 <Rect x="20" y="28" width="72" height="76" rx="4" fill="#29B6F6"/>
+                 <Rect x="20" y="28" width="72" height="20" fill="#1976D2"/>
+                 <Rect x="32" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+                 <Rect x="68" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+                 
+                 {/* Jours */}
+                 <Rect x="32" y="56" width="12" height="12" rx="2" fill="#1565C0"/>
+                 <Rect x="52" y="56" width="12" height="12" rx="2" fill="#ffffff"/>
+                 <Rect x="32" y="76" width="12" height="12" rx="2" fill="#ffffff"/>
+                 <Rect x="52" y="76" width="12" height="12" rx="2" fill="#1565C0"/>
+                 <Rect x="72" y="76" width="12" height="12" rx="2" fill="#FBC02D"/>
+               </Svg>
+             </View>
+
+             <Text style={s.guestTitle}>Planifiez vos rendez-vous</Text>
+             <Text style={s.guestSubtitle}>
+               Trouvez un professionnel de la santé et prenez rendez-vous en ligne à tout moment.
+             </Text>
+
+             <Pressable style={s.connectButton} onPress={handleLoginPress}>
+               <Text style={s.connectButtonText}>SE CONNECTER</Text>
+             </Pressable>
+           </View>
+         );
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      {/* Header identique aux autres écrans */}
-      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={s.header}>
-          <View style={{ width: 24 }} />
-          <Text style={s.title}>Mes rendez-vous</Text>
-          <View style={{ width: 24 }} />
-        </View>
-      </LinearGradient>
+    <View style={s.container}>
+      <HeaderGradient navigation={navigation} options={{ title: 'Mes rendez-vous' }} />
 
       <Animated.View style={[
         s.content,
@@ -157,17 +330,58 @@ export default function AppointmentsScreen({ navigation }) {
           ) : appointments.length === 0 ? (
             renderEmptyState()
           ) : (
-            <FlatList
-              data={appointments}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderAppointmentItem}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={s.listContent}
-            />
+            <>
+              {renderSelectionToolbar()}
+              <FlatList
+                data={paginatedAppointments}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderAppointmentItem}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={s.listContent}
+              />
+              {renderPagination()}
+            </>
           )}
         </View>
       </Animated.View>
-    </SafeAreaView>
+
+      {/* Modal de confirmation de suppression */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <Ionicons name="warning" size={32} color={colors.warning} />
+              <Text style={s.modalTitle}>Supprimer les rendez-vous</Text>
+            </View>
+            
+            <Text style={s.modalMessage}>
+              Êtes-vous sûr de vouloir supprimer {selectedAppointments.length} rendez-vous ? Cette action est irréversible.
+            </Text>
+            
+            <View style={s.modalActions}>
+              <Pressable 
+                style={s.modalButtonSecondary} 
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={s.modalButtonSecondaryText}>Annuler</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={s.modalButtonPrimary} 
+                onPress={confirmBulkDelete}
+              >
+                <Text style={s.modalButtonPrimaryText}>Supprimer</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -179,76 +393,278 @@ const s = StyleSheet.create({
   content: {
     flex: 1,
   },
-  header: {
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  title: { 
-    color: 'white', 
-    fontSize: 18, 
-    fontWeight: '700', 
-    textAlign: 'center', 
-    flex: 1 
-  },
   body: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   listContent: {
     paddingBottom: spacing.section,
   },
+  // Styles pour les cartes de rendez-vous
   appointmentCard: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  selectedCard: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.8,
+  },
+  card: {
+    backgroundColor: colors.background,
     borderRadius: 16,
-    padding: spacing.lg,
-  },
-  appointmentContent: {
     padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
-  appointmentHeader: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
-  appointmentIcon: {
+  doctorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  doctorAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primaryMuted,
-    alignItems: 'center',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
-    marginRight: spacing.md,
+    alignItems: 'center',
+    marginRight: spacing.sm,
   },
-  appointmentInfo: {
+  doctorInitial: {
+    ...textStyles.h4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+  },
+  doctorDetails: {
     flex: 1,
   },
-  appointmentTitle: {
-    ...textStyles.semibold,
-    fontSize: 17,
+  doctorName: {
+    ...textStyles.h4,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
+    marginBottom: 1,
+  },
+  doctorSpecialty: {
+    ...textStyles.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  selectionIndicator: {
+    marginLeft: spacing.sm,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  checkboxSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  appointmentDetails: {
+    marginBottom: spacing.sm,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  appointmentDate: {
-    ...textStyles.bodySmall,
-    fontSize: 14,
-    color: colors.textSecondary,
+  detailIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primaryMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  detailText: {
+    ...textStyles.body,
+    fontSize: 13,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   statusText: {
-    ...textStyles.bodySmall,
-    fontSize: 12,
+    ...textStyles.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'white',
+  },
+
+  // Styles pour la pagination
+  paginationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  paginationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  paginationButtonDisabled: {
+    backgroundColor: colors.borderLight,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  paginationInfo: {
+    marginHorizontal: spacing.lg,
+  },
+  paginationText: {
+    ...textStyles.body,
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+
+  // Styles pour la barre de sélection
+  selectionToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  toolbarButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toolbarButtonDisabled: {
+    opacity: 0.5,
+  },
+  selectionCount: {
+    ...textStyles.body,
+    fontSize: 13,
+    color: colors.textPrimary,
     fontWeight: '600',
   },
-  appointmentActions: {
+
+  // Styles pour le modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
     marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    ...textStyles.body,
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.xl,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundSecondary,
+    alignItems: 'center',
+  },
+  modalButtonSecondaryText: {
+    ...textStyles.button,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    ...textStyles.button,
+    fontSize: 16,
+    color: 'white',
   },
   emptyContainer: {
     flex: 1,
@@ -284,16 +700,20 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.section,
+    paddingHorizontal: spacing.xl,
   },
-  guestIcon: {
-    marginBottom: spacing.lg,
+  calendarIconContainer: {
+    position: 'relative',
+    marginBottom: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   guestTitle: {
     ...textStyles.h2,
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.sm,
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
   guestSubtitle: {
@@ -301,11 +721,22 @@ const s = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
   },
-  guestButton: {
-    marginTop: spacing.md,
+  connectButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    minWidth: 200,
+  },
+  connectButtonText: {
+    ...textStyles.button,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
 });

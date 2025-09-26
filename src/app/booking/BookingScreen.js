@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -84,17 +83,31 @@ export default function BookingScreen({ navigation, route }) {
     if (!selectedDate || !selectedTime || !doctor) return;
     
     if (!token) {
-      // Rediriger vers la connexion si pas connecté
-      navigation.navigate('Auth', { screen: 'Login' });
+      Alert.alert(
+        'Connexion requise',
+        'Vous devez vous connecter pour confirmer votre rendez-vous.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Se connecter', onPress: () => navigation.navigate('Auth', { screen: 'Login' }) },
+        ]
+      );
       return;
     }
     
-    // Navigation vers confirmation ou autre écran
-    navigation.navigate('BookingConfirmation', {
-      doctor,
-      date: selectedDate,
-      time: selectedTime,
-    });
+    // Simulation de la prise de rendez-vous
+    Alert.alert(
+      'Rendez-vous confirmé !',
+      `Votre rendez-vous avec ${doctor?.title || 'Dr'} ${doctor?.lastName || 'Nom non disponible'} est confirmé pour le ${selectedDate} à ${selectedTime}.`,
+      [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Ici on sauvegarderait le rendez-vous
+            navigation.goBack();
+          }
+        }
+      ]
+    );
   };
 
   const renderDateItem = (dateInfo) => (
@@ -152,115 +165,138 @@ export default function BookingScreen({ navigation, route }) {
   );
 
   return (
-    <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
-      <Animated.View style={[
-        s.content,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
-      ]}>
-        {/* Doctor Summary */}
-        {doctor && (
-          <Card style={s.doctorCard} elevation="low">
-            <View style={s.doctorSummary}>
-              <View style={s.doctorAvatar}>
-                <Ionicons name="medical" size={24} color={colors.primary} />
-              </View>
-              <View style={s.doctorInfo}>
-                <Text style={s.doctorName}>{doctor.title} {doctor.lastName}</Text>
-                <Text style={s.doctorSpecialty}>{doctor.specialty}</Text>
-                <View style={s.doctorLocation}>
-                  <Ionicons name="location" size={14} color={colors.textSecondary} />
-                  <Text style={s.doctorAddress}>{doctor.city}</Text>
+    <View style={s.container}>
+      {/* Header avec navigation */}
+      <View style={s.header}>
+        <View style={s.headerTop}>
+          <Pressable onPress={() => navigation.goBack()} style={s.backButton}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </Pressable>
+          <Text style={s.headerTitle}>Prendre rendez-vous</Text>
+          <View style={s.headerActions}>
+            <Pressable style={s.headerAction}>
+              <Ionicons name="calendar-outline" size={24} color="white" />
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false}>
+        <Animated.View style={[
+          s.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}>
+          {/* Doctor Summary */}
+          {doctor && (
+            <View style={s.doctorCard}>
+              <View style={s.doctorSummary}>
+                <View style={s.doctorAvatar}>
+                  <Ionicons name="medical" size={32} color={colors.primary} />
+                </View>
+                <View style={s.doctorInfo}>
+                  <Text style={s.doctorName}>{doctor.title} {doctor.lastName}</Text>
+                  <Text style={s.doctorSpecialty}>{doctor.specialty}</Text>
+                  <View style={s.doctorLocation}>
+                    <Ionicons name="location" size={16} color={colors.textSecondary} />
+                    <Text style={s.doctorAddress}>{doctor.district}, {doctor.city}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </Card>
-        )}
+          )}
 
-        {/* Date Selection */}
-        <Card style={s.dateCard} elevation="low">
-          <View style={s.sectionHeader}>
-            <Ionicons name="calendar" size={20} color={colors.primary} />
-            <Text style={s.sectionTitle}>Choisir une date</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.datesContainer}>
-            <View style={s.datesList}>
-              {availableDates.map(renderDateItem)}
-            </View>
-          </ScrollView>
-        </Card>
-
-        {/* Time Selection */}
-        {selectedDate && (
-          <Card style={s.timeCard} elevation="low">
+          {/* Date Selection */}
+          <View style={s.dateCard}>
             <View style={s.sectionHeader}>
-              <Ionicons name="time" size={20} color={colors.primary} />
-              <Text style={s.sectionTitle}>Choisir un créneau</Text>
-            </View>
-            <View style={s.timeSlotsContainer}>
-              {timeSlots.map(renderTimeSlot)}
-            </View>
-          </Card>
-        )}
-
-        {/* Booking Summary */}
-        {selectedDate && selectedTime && doctor && (
-          <Card style={s.summaryCard} elevation="low">
-            <View style={s.sectionHeader}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={s.sectionTitle}>Résumé du rendez-vous</Text>
-            </View>
-            <View style={s.summaryContent}>
-              <View style={s.summaryItem}>
-                <Text style={s.summaryLabel}>Médecin</Text>
-                <Text style={s.summaryValue}>{doctor.title} {doctor.lastName}</Text>
+              <View style={s.sectionIcon}>
+                <Ionicons name="calendar" size={20} color={colors.primary} />
               </View>
-              <View style={s.summaryItem}>
-                <Text style={s.summaryLabel}>Date</Text>
-                <Text style={s.summaryValue}>
-                  {selectedDate.day} {selectedDate.dayNumber} {selectedDate.month}
-                </Text>
-              </View>
-              <View style={s.summaryItem}>
-                <Text style={s.summaryLabel}>Heure</Text>
-                <Text style={s.summaryValue}>{selectedTime.time}</Text>
-              </View>
+              <Text style={s.sectionTitle}>Choisir une date</Text>
             </View>
-          </Card>
-        )}
-
-        {/* Guest Message */}
-        {selectedDate && selectedTime && !token && (
-          <Card style={s.guestCard} elevation="low">
-            <View style={s.guestContent}>
-              <View style={s.guestIcon}>
-                <Ionicons name="person-outline" size={32} color={colors.primary} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.datesContainer}>
+              <View style={s.datesList}>
+                {availableDates.map(renderDateItem)}
               </View>
-              <View style={s.guestInfo}>
-                <Text style={s.guestTitle}>Connexion requise</Text>
-                <Text style={s.guestSubtitle}>
-                  Connectez-vous pour confirmer votre rendez-vous
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
-
-        {/* Confirm Button */}
-        {selectedDate && selectedTime && doctor && (
-          <View style={s.confirmButtonContainer}>
-            <Button
-              title={token ? "Confirmer le rendez-vous" : "Se connecter pour confirmer"}
-              onPress={handleConfirmBooking}
-              icon={<Ionicons name={token ? "checkmark" : "log-in"} size={20} color="white" />}
-              style={s.confirmButton}
-            />
+            </ScrollView>
           </View>
-        )}
-      </Animated.View>
-    </ScrollView>
+
+          {/* Time Selection */}
+          {selectedDate && (
+            <View style={s.timeCard}>
+              <View style={s.sectionHeader}>
+                <View style={s.sectionIcon}>
+                  <Ionicons name="time" size={20} color={colors.primary} />
+                </View>
+                <Text style={s.sectionTitle}>Choisir un créneau</Text>
+              </View>
+              <View style={s.timeSlotsContainer}>
+                {timeSlots.map(renderTimeSlot)}
+              </View>
+            </View>
+          )}
+
+          {/* Booking Summary */}
+          {selectedDate && selectedTime && doctor && (
+            <View style={s.summaryCard}>
+              <View style={s.sectionHeader}>
+                <View style={s.sectionIcon}>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                </View>
+                <Text style={s.sectionTitle}>Résumé du rendez-vous</Text>
+              </View>
+              <View style={s.summaryContent}>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryLabel}>Médecin</Text>
+                  <Text style={s.summaryValue}>{doctor.title} {doctor.lastName}</Text>
+                </View>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryLabel}>Date</Text>
+                  <Text style={s.summaryValue}>
+                    {selectedDate.day} {selectedDate.dayNumber} {selectedDate.month}
+                  </Text>
+                </View>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryLabel}>Heure</Text>
+                  <Text style={s.summaryValue}>{selectedTime.time}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Guest Message */}
+          {selectedDate && selectedTime && !token && (
+            <View style={s.guestCard}>
+              <View style={s.guestContent}>
+                <View style={s.guestIcon}>
+                  <Ionicons name="person-outline" size={32} color={colors.primary} />
+                </View>
+                <View style={s.guestInfo}>
+                  <Text style={s.guestTitle}>Connexion requise</Text>
+                  <Text style={s.guestSubtitle}>
+                    Connectez-vous pour confirmer votre rendez-vous
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Confirm Button */}
+          {selectedDate && selectedTime && doctor && (
+            <View style={s.confirmButtonContainer}>
+              <Button
+                title={token ? "Confirmer le rendez-vous" : "Se connecter pour confirmer"}
+                onPress={handleConfirmBooking}
+                icon={<Ionicons name={token ? "checkmark" : "log-in"} size={20} color="white" />}
+                style={s.confirmButton}
+              />
+            </View>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -269,14 +305,51 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
+  header: {
+    backgroundColor: colors.primaryDeep,
+    paddingTop: 50,
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.section,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: spacing.sm,
+  },
+  headerTitle: {
+    ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: spacing.lg,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAction: {
+    padding: spacing.sm,
+    marginLeft: spacing.sm,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingBottom: spacing.xl,
   },
   doctorCard: {
-    marginBottom: spacing.lg,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   doctorSummary: {
     flexDirection: 'row',
@@ -284,9 +357,9 @@ const s = StyleSheet.create({
     padding: spacing.lg,
   },
   doctorAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
@@ -320,16 +393,28 @@ const s = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   dateCard: {
-    marginBottom: spacing.lg,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   timeCard: {
-    marginBottom: spacing.lg,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   summaryCard: {
-    marginBottom: spacing.lg,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -338,13 +423,21 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
   },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
   sectionTitle: {
     ...textStyles.h3,
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    marginLeft: spacing.sm,
-    letterSpacing: 0.3,
+    flex: 1,
   },
   datesContainer: {
     paddingHorizontal: spacing.lg,
@@ -471,9 +564,12 @@ const s = StyleSheet.create({
     borderRadius: 16,
   },
   guestCard: {
-    marginBottom: spacing.lg,
-    borderRadius: 16,
     backgroundColor: colors.primaryMuted,
+    borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   guestContent: {
     flexDirection: 'row',

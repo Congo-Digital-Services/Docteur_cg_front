@@ -52,6 +52,27 @@ const useAuthStore = create((set, get) => ({
   logout: async () => {
     await AsyncStorage.removeItem('auth_token');
     set({ token: null, user: null });
+  },
+
+  // Simulation de connexion pour les tests
+  simulateLogin: () => {
+    const mockUser = {
+      id: '1',
+      firstName: 'Jean-Baptiste',
+      lastName: 'Moukengue',
+      email: 'jean.moukengue@example.cg',
+      phone: '+242 05 12 34 56 78',
+      birthDate: '15/03/1985',
+      address: '123 Avenue de l\'Indépendance',
+      city: 'Brazzaville',
+      district: 'Moungali',
+      emergencyContact: 'Marie Mabiala',
+      emergencyPhone: '+242 05 98 76 54 32'
+    };
+    const mockToken = 'mock_token_123';
+    
+    set({ token: mockToken, user: mockUser });
+    AsyncStorage.setItem('auth_token', mockToken);
   }
 }));
 

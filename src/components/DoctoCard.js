@@ -75,7 +75,7 @@ export default function DoctorCard({ doctor, distanceKm, onPress }) {
         <View style={s.footer}>
           <View style={s.locationContainer}>
             <Ionicons name="location-outline" size={16} color={colors.textTertiary} />
-            <Text style={s.location}>{doctor.city}</Text>
+            <Text style={s.location}>{doctor.district}, {doctor.city}</Text>
           </View>
           <View style={s.ratingContainer}>
             <Ionicons name="star" size={14} color={colors.warning} />

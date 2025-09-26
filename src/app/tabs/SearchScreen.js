@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Animated, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Animated, Pressable, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { colors, spacing, radius, textStyles } from '../../theme';
 import Input from '../../components/Input';
 import Card from '../../components/Card';
+import Button from '../../components/Button';
+import HeaderGradient from '../../navigation/HeaderGradient';
+import useAuthStore from '../../stores/auth.store';
 import doctors from '../../mocks/doctors.json';
 import specialties from '../../mocks/specialties.json';
 
 export default function SearchScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const insets = useSafeAreaInsets();
   const [isSearching, setIsSearching] = useState(false);
+  const { token } = useAuthStore();
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -53,7 +54,8 @@ export default function SearchScreen({ navigation }) {
         return (
           fullName.includes(query) ||
           (doctor.specialty && doctor.specialty.toLowerCase().includes(query)) ||
-          (doctor.city && doctor.city.toLowerCase().includes(query))
+          (doctor.city && doctor.city.toLowerCase().includes(query)) ||
+          (doctor.district && doctor.district.toLowerCase().includes(query))
         );
       });
       
@@ -65,6 +67,18 @@ export default function SearchScreen({ navigation }) {
   }, [searchQuery]);
 
   const handleDoctorPress = (doctor) => {
+    if (!token) {
+      Alert.alert(
+        'Connexion requise',
+        'Vous devez vous connecter pour voir les détails du médecin et prendre rendez-vous.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Se connecter', onPress: () => navigation.navigate('Auth', { screen: 'Login' }) },
+        ]
+      );
+      return;
+    }
+    
     navigation.navigate('BookingStack', { 
       screen: 'DoctorDetails', 
       params: { doctor } 
@@ -83,7 +97,7 @@ export default function SearchScreen({ navigation }) {
             <Text style={s.doctorSpecialty}>{item.specialty}</Text>
             <View style={s.doctorLocation}>
               <Ionicons name="location" size={14} color={colors.textSecondary} />
-              <Text style={s.doctorAddress}>{item.city}</Text>
+              <Text style={s.doctorAddress}>{item.district}, {item.city}</Text>
             </View>
           </View>
           <View style={s.doctorActions}>
@@ -95,16 +109,9 @@ export default function SearchScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      {/* Header exactement comme l'écran de détails */}
-      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={s.header}>
-          <View style={{ width: 24 }} />
-          <Text style={s.title}>Rechercher un médecin</Text>
-          <View style={{ width: 24 }} />
-        </View>
-      </LinearGradient>
-
+    <View style={s.container}>
+      <HeaderGradient navigation={navigation} options={{ title: 'Rechercher un médecin' }} />
+      
       {/* Search Input fixe */}
       <View style={s.searchContainer}>
         <Input 
@@ -160,19 +167,15 @@ export default function SearchScreen({ navigation }) {
           {/* Help Section */}
           {searchQuery.length === 0 && (
             <View style={s.helpSection}>
-              <Text style={s.helpTitle}>Spécialités disponibles</Text>
-              <View style={s.specialtiesContainer}>
-                {specialties.slice(0, 8).map((specialty, index) => (
-                  <View key={index} style={s.specialtyTag}>
-                    <Text style={s.specialtyText}>{specialty}</Text>
-                  </View>
-                ))}
-              </View>
+              <Text style={s.helpTitle}>Comment rechercher ?</Text>
+              <Text style={s.helpSubtitle}>
+                Vous pouvez rechercher par nom de médecin, spécialité ou établissement
+              </Text>
             </View>
           )}
         </Animated.View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -186,20 +189,6 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  header: {
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  title: { 
-    color: 'white', 
-    fontSize: 18, 
-    fontWeight: '700', 
-    textAlign: 'center', 
-    flex: 1 
   },
   searchContainer: {
     backgroundColor: colors.background,
@@ -309,27 +298,18 @@ const s = StyleSheet.create({
   },
   helpTitle: {
     ...textStyles.h3,
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: spacing.md,
-    letterSpacing: 0.3,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  specialtiesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  specialtyTag: {
-    backgroundColor: colors.primaryMuted,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-  },
-  specialtyText: {
-    ...textStyles.bodySmall,
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.primary,
+  helpSubtitle: {
+    ...textStyles.body,
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
   },
 });

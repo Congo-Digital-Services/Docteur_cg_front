@@ -18,23 +18,22 @@ export default function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: colors.borderLight,
+          backgroundColor: colors.background,
+          borderTopWidth: 0,
           paddingTop: spacing.sm,
           paddingBottom: Platform.OS === 'ios' ? spacing.lg : spacing.sm,
           height: Platform.OS === 'ios' ? 90 : 70,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
+          shadowOffset: { width: 0, height: -1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+          elevation: 2,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
+          fontSize: 11,
+          fontWeight: '400',
           marginTop: spacing.xs,
         },
         tabBarIcon: ({ color, size, focused }) => {
@@ -46,16 +45,11 @@ export default function MainTabs() {
           };
           
           return (
-            <View style={[
-              s.iconContainer,
-              focused && s.iconContainerActive
-            ]}>
-              <Ionicons 
-                name={iconMap[route.name]} 
-                size={focused ? 26 : 24} 
-                color={color} 
-              />
-            </View>
+            <Ionicons 
+              name={iconMap[route.name]} 
+              size={focused ? 24 : 22} 
+              color={color} 
+            />
           );
         }
       })}
@@ -96,16 +90,3 @@ export default function MainTabs() {
   );
 }
 
-const s = StyleSheet.create({
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  iconContainerActive: {
-    backgroundColor: colors.primaryMuted,
-  },
-});
