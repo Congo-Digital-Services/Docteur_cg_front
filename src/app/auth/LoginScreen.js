@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }) {
 
   const onSubmit = async ({ email, password }) => {
     try {
-      await login(email, password);
+      await login({ email, password });
       toast.show('Connecté avec succès ✅');
       navigation.replace('MainTabs');
     } catch (e) {

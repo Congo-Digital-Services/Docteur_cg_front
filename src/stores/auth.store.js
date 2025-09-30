@@ -1,6 +1,7 @@
+// src/stores/auth.store.js
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as apiLogin, register as apiRegister, me as apiMe } from '../services/auth';
+import { login as apiLogin, register as apiRegister, me as apiMe } from '@/services/auth';
 
 const useAuthStore = create((set, get) => ({
   token: null,
@@ -12,7 +13,7 @@ const useAuthStore = create((set, get) => ({
     if (token) {
       set({ token });
       try {
-        const user = await apiMe(token);
+        const user = await apiMe(token); // me() renvoie directement le profil normalisé
         set({ user });
       } catch {
         set({ token: null, user: null });
@@ -21,12 +22,16 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async (email, password) => {
+  // credentials = { email, password, phone? }
+  login: async (credentials) => {
     set({ loading: true });
     try {
-      const { token } = await apiLogin(email, password);
+      const { token } = await apiLogin(credentials); // toujours { token } grâce à la normalisation
+      if (!token) throw new Error("Token manquant à la connexion");
+
       await AsyncStorage.setItem('auth_token', token);
-      const user = await apiMe(token);
+
+      const user = await apiMe(token); // me() -> profil (client)
       set({ token, user, loading: false });
       return true;
     } catch (e) {
@@ -35,11 +40,19 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  register: async (email, password) => {
+  // data = { email, password, firstName, lastName, phone? }
+  register: async (data) => {
     set({ loading: true });
     try {
-      const { token } = await apiRegister(email, password);
+      const res = await apiRegister(data); // { ok: true }
+      if (!res?.ok) throw new Error("Échec de la création du compte");
+
+      // login immédiat
+      const { token } = await apiLogin({ email: data.email, password: data.password });
+      if (!token) throw new Error("Impossible de récupérer le token après inscription");
+
       await AsyncStorage.setItem('auth_token', token);
+
       const user = await apiMe(token);
       set({ token, user, loading: false });
       return true;
@@ -53,27 +66,6 @@ const useAuthStore = create((set, get) => ({
     await AsyncStorage.removeItem('auth_token');
     set({ token: null, user: null });
   },
-
-  // Simulation de connexion pour les tests
-  simulateLogin: () => {
-    const mockUser = {
-      id: '1',
-      firstName: 'Jean-Baptiste',
-      lastName: 'Moukengue',
-      email: 'jean.moukengue@example.cg',
-      phone: '+242 05 12 34 56 78',
-      birthDate: '15/03/1985',
-      address: '123 Avenue de l\'Indépendance',
-      city: 'Brazzaville',
-      district: 'Moungali',
-      emergencyContact: 'Marie Mabiala',
-      emergencyPhone: '+242 05 98 76 54 32'
-    };
-    const mockToken = 'mock_token_123';
-    
-    set({ token: mockToken, user: mockUser });
-    AsyncStorage.setItem('auth_token', mockToken);
-  }
 }));
 
 // auto-init

@@ -51,11 +51,12 @@ export default function SignupScreen({ navigation }) {
 
   const onSubmit = async (data) => {
     try {
-      await register(data.email, data.password);
+      await register(data);
       toast.show('Compte créé avec succès ✅');
       navigation.replace('MainTabs');
     } catch (e) {
       toast.show(e.message || 'Erreur lors de la création du compte');
+      console.log("erreur:",e)
     }
   };
 
@@ -163,14 +164,14 @@ export default function SignupScreen({ navigation }) {
               rules={{
                 required: 'Le numéro de téléphone est requis',
                 pattern: {
-                  value: /^[0-9+\-\s()]{10,}$/,
+                  value: /^(04|05|06)[0-9]{7}$/,
                   message: 'Format de téléphone invalide'
                 }
               }}
               render={({ field: { onChange, value } }) => (
                 <Input 
                   label="Numéro de téléphone"
-                  placeholder="06 12 34 56 78" 
+                  placeholder="06 123 4567" 
                   keyboardType="phone-pad"
                   autoComplete="tel"
                   value={value} 
