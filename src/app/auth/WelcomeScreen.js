@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, Dimensions, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Dimensions, Animated, Platform, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
@@ -168,10 +168,12 @@ export default function WelcomeScreen({ navigation }) {
             ]}
           >
             <View style={s.logoIconContainer}>
-              <Ionicons name="medical" size={32} color="white" />
+              <Image 
+                source={require('../../../assets/Logo/Fichier 4.png')} 
+                style={s.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={s.logoText}>Docteur CG</Text>
-            <View style={s.logoAccent} />
           </Animated.View>
           
           {/* Titre principal avec animation séparée */}
@@ -325,6 +327,10 @@ const s = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  logoImage: {
+    width: 60,
+    height: 60,
   },
   logoText: {
     ...textStyles.hero,

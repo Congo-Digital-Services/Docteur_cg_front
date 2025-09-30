@@ -115,14 +115,20 @@ export default function HomeScreen({ navigation }) {
             s.heroTopBar,
             { opacity: headerTopBarOpacity }
           ]}>
-            <View style={s.logoContainer}>
-              <Text style={s.logoText}>Docteur CG</Text>
+            {/* Ligne du haut : Logo + Titre + Bouton */}
+            <View style={s.headerTopRow}>
+              <View style={s.logoAndTitleContainer}>
+                
+                <Text style={s.headerTitle}>Docteur CG</Text>
+              </View>
+              {!token && (
+                <Pressable onPress={() => navigation.navigate('Login')} style={s.connectButton}>
+                  <Text style={s.connectButtonText}>Se connecter</Text>
+                </Pressable>
+              )}
             </View>
-            {!token && (
-              <Pressable onPress={() => navigation.navigate('Login')} style={s.connectButton}>
-                <Text style={s.connectButtonText}>Se connecter</Text>
-              </Pressable>
-            )}
+            
+           
           </Animated.View>
 
           <Animated.View style={[
@@ -143,7 +149,11 @@ export default function HomeScreen({ navigation }) {
             
             <View style={s.heroImageContainer}>
               <View style={s.medicalIcon}>
-                <Ionicons name="medical" size={40} color="white" />
+                <Image 
+                  source={require('../../../assets/Logo/Fichier 4.png')} 
+                  style={s.heroLogoImage}
+                  resizeMode="contain"
+                />
               </View>
             </View>
           </Animated.View>
@@ -405,6 +415,10 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
+  heroLogoImage: {
+    width: 50,
+    height: 50,
+  },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 16,
@@ -435,11 +449,27 @@ const s = StyleSheet.create({
     gap: spacing.sm,
   },
   heroTopBar: {
+    marginBottom: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-    paddingTop: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  headerBottomRow: {
+    alignItems: 'center',
+  },
+  logoAndTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    marginRight: spacing.sm,
   },
   connectButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -706,17 +736,21 @@ const s = StyleSheet.create({
 
 
   // Styles pour le logo et le bouton recherche
-  logoContainer: {
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '800',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: 'white',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
   searchPill: {
     alignSelf: 'center',
