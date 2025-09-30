@@ -1,19 +1,37 @@
 import axios from 'axios';
 import useAuthStore from '../stores/auth.store';
 
+// Déterminer le mode à partir du .env
+const mode = process.env.APP_MODE || 'mock';
+
+let baseURL;
+
+switch (mode) {
+  case 'real':
+    baseURL = process.env.API_URL;
+    break;
+  case 'dev':
+    baseURL = process.env.API_URL_DEV;
+    break;
+  case 'mock':
+  default:
+    baseURL = process.env.API_URL_MOCK;
+    break;
+}
+
 const api = axios.create({
-  baseURL: 'https://mock.local', // virtuel, on utilise des mocks
-  timeout: 6000
+  baseURL,
+  timeout: 6000,
 });
 
-// Intercepteur: ajoute token si présent
+// Intercepteur: ajoute le token si présent
 api.interceptors.request.use(async (cfg) => {
   const token = useAuthStore.getState().token;
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });
 
-// Intercepteur erreurs simple
+// Intercepteur: gestion simple des erreurs
 api.interceptors.response.use(
   (res) => res,
   (error) => {
