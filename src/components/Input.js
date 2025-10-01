@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { TextInput, View, Text, StyleSheet, Animated } from 'react-native';
+import { TextInput, View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 import { radius } from '../theme/radius';
 import { spacing } from '../theme/spacing';
@@ -19,6 +20,7 @@ export default function Input({
   const borderAnim = useRef(new Animated.Value(0)).current;
   const labelAnim = useRef(new Animated.Value(props.value ? 1 : 0)).current;
   const [isFocused, setIsFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const focus = () => {
     setIsFocused(true);
@@ -57,6 +59,8 @@ export default function Input({
 
   const isSmall = size === 'small';
   const isLarge = size === 'large';
+  const isPassword = props.secureTextEntry;
+  const shouldShowPasswordToggle = isPassword;
 
   return (
     <View style={[s.container, containerStyle]}>
@@ -75,28 +79,49 @@ export default function Input({
         { 
           borderColor, 
           backgroundColor,
-          height: isSmall ? 40 : isLarge ? 56 : 48,
+          minHeight: isSmall ? 44 : isLarge ? 60 : 52,
           borderRadius: isSmall ? radius.sm : isLarge ? radius.lg : radius.md,
         }, 
         style
       ]}>
-        <TextInput
-          placeholderTextColor={colors.textMuted}
-          onFocus={focus}
-          onBlur={blur}
-          style={[
-            s.input,
-            isSmall ? s.inputSmall : isLarge ? s.inputLarge : s.inputMedium
-          ]}
-          {...accessibilityProps.input}
-          accessibilityLabel={accessibilityLabel || label}
-          accessibilityHint={accessibilityHint || 'Champ de saisie'}
-          accessibilityState={{ 
-            disabled: props.editable === false,
-            invalid: !!error 
-          }}
-          {...props}
-        />
+        <View style={s.inputContainer}>
+          <TextInput
+            {...props}
+            placeholderTextColor={colors.textMuted}
+            onFocus={focus}
+            onBlur={blur}
+            style={[
+              s.input,
+              isSmall ? s.inputSmall : isLarge ? s.inputLarge : s.inputMedium,
+              shouldShowPasswordToggle && s.inputWithIcon
+            ]}
+            secureTextEntry={isPassword && !showPassword}
+            multiline={false}
+            numberOfLines={1}
+            {...accessibilityProps.input}
+            accessibilityLabel={accessibilityLabel || label}
+            accessibilityHint={accessibilityHint || 'Champ de saisie'}
+            accessibilityState={{ 
+              disabled: props.editable === false,
+              invalid: !!error 
+            }}
+          />
+          
+          {shouldShowPasswordToggle && (
+            <TouchableOpacity
+              style={s.passwordToggle}
+              onPress={() => setShowPassword(!showPassword)}
+              accessibilityLabel={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off' : 'eye'}
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </Animated.View>
       
       {error && (
@@ -126,6 +151,7 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     justifyContent: 'center',
     minHeight: touchTargetSize.minimum,
     shadowColor: colors.shadowLight,
@@ -134,19 +160,43 @@ const s = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    height: '100%',
+  },
   input: {
     ...textStyles.body,
     color: colors.text,
     padding: 0,
+    flex: 1,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    textAlign: 'left',
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: '100%',
+  },
+  inputWithIcon: {
+    paddingRight: spacing.md,
+  },
+  passwordToggle: {
+    padding: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputSmall: {
     fontSize: 14,
+    lineHeight: 20,
   },
   inputMedium: {
     fontSize: 16,
+    lineHeight: 22,
   },
   inputLarge: {
     fontSize: 18,
+    lineHeight: 24,
   },
   errorText: {
     ...textStyles.caption,

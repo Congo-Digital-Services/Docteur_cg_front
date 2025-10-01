@@ -1,7 +1,14 @@
 // src/stores/auth.store.js
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as apiLogin, register as apiRegister, me as apiMe } from '@/services/auth';
+import { 
+  login as apiLogin, 
+  register as apiRegister, 
+  me as apiMe,
+  registerWithOtp as apiRegisterWithOtp,
+  loginWithOtp as apiLoginWithOtp
+} from '@/services/auth';
+import { verifyOtp } from '@/services/otp';
 
 const useAuthStore = create((set, get) => ({
   token: null,
@@ -55,6 +62,62 @@ const useAuthStore = create((set, get) => ({
 
       const user = await apiMe(token);
       set({ token, user, loading: false });
+      return true;
+    } catch (e) {
+      set({ loading: false });
+      throw e;
+    }
+  },
+
+  // Inscription avec OTP
+  registerWithOtp: async (data) => {
+    set({ loading: true });
+    try {
+      const result = await apiRegisterWithOtp(data);
+      set({ loading: false });
+      return result; // { ok: true, otpSent: true, otpMessage, expiresIn }
+    } catch (e) {
+      set({ loading: false });
+      throw e;
+    }
+  },
+
+  // Connexion avec OTP
+  loginWithOtp: async (credentials) => {
+    set({ loading: true });
+    try {
+      const result = await apiLoginWithOtp(credentials);
+      set({ loading: false });
+      return result; // { token, otpSent: true, otpMessage, expiresIn }
+    } catch (e) {
+      set({ loading: false });
+      throw e;
+    }
+  },
+
+  // Vérification OTP et finalisation de l'authentification
+  verifyOtpAndComplete: async ({ code, purpose, userId, email, password }) => {
+    set({ loading: true });
+    try {
+      // 1. Vérifier le code OTP
+      await verifyOtp({ code, purpose, userId });
+
+      // 2. Finaliser la connexion selon le purpose
+      if (purpose === 'SIGNUP') {
+        // Connexion automatique après inscription
+        const { token } = await apiLogin({ email, password });
+        await AsyncStorage.setItem('auth_token', token);
+        const user = await apiMe(token);
+        set({ token, user, loading: false });
+      } else if (purpose === 'LOGIN') {
+        // La connexion est déjà faite, récupérer le profil
+        const token = get().token;
+        if (token) {
+          const user = await apiMe(token);
+          set({ user, loading: false });
+        }
+      }
+
       return true;
     } catch (e) {
       set({ loading: false });
