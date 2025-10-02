@@ -1,4 +1,3 @@
-// src/app/auth/OtpScreen.js
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Alert, Platform, TextInput, KeyboardAvoidingView, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,18 +6,19 @@ import Button from '../../components/Button';
 import { spacing } from '../../theme/spacing';
 import colors from '../../theme/colors';
 import { textStyles } from '../../theme/typography';
-import { verifyOtp, resendOtp, OTP_EXPIRATION } from '../../services/otp';
 import useAuthStore from '../../stores/auth.store';
 import Toast from '../../components/Toast';
 
 export default function OtpScreen({ route, navigation }) {
-  const { email, phone, purpose, userId, target, password, action } = route.params || {};
-  const verifyOtpAndComplete = useAuthStore((s) => s.verifyOtpAndComplete);
+  const { email, phone, purpose, token } = route.params || {};
+  const confirmAccount = useAuthStore((s) => s.confirmAccount);
+  const confirmPasswordReset = useAuthStore((s) => s.confirmPasswordReset);
+  const resendVerificationCode = useAuthStore((s) => s.resendVerificationCode);
+  const loading = useAuthStore((s) => s.loading);
   
   const [code, setCode] = useState(['', '', '', '', '', '']);
-  const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(OTP_EXPIRATION / 1000); // en secondes
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes en secondes
   const [canResend, setCanResend] = useState(false);
   
   const inputRefs = useRef([]);
@@ -79,30 +79,21 @@ export default function OtpScreen({ route, navigation }) {
       return;
     }
 
-    setLoading(true);
     try {
-      // Vérifier le code OTP seulement
-      await verifyOtp({
-        code: otpCode,
-        purpose,
-        userId
-      });
-      
-      toast.current?.show('Code vérifié avec succès ✅');
-      
-      // Navigation vers l'écran de connexion avec les données
-      navigation.navigate('Login', {
-        email: email,
-        password: password,
-        fromOtp: true,
-        message: 'Code OTP vérifié. Vous pouvez maintenant vous connecter.'
-      });
+      if (purpose === 'ACCOUNT_VERIFICATION') {
+        await confirmAccount(otpCode);
+        toast.current?.show('Compte vérifié avec succès ✅');
+        navigation.replace('MainTabs');
+      } else if (purpose === 'PASSWORD_RESET') {
+        navigation.navigate('ResetPassword', { 
+          resetToken: token, 
+          code: otpCode 
+        });
+      }
     } catch (error) {
       toast.current?.show(error.message || 'Code OTP invalide');
       setCode(['', '', '', '', '', '']); // Reset du code
       inputRefs.current[0]?.focus();
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,15 +101,9 @@ export default function OtpScreen({ route, navigation }) {
   const handleResend = async () => {
     setResendLoading(true);
     try {
-      await resendOtp({
-        email,
-        phone,
-        purpose,
-        target
-      });
-      
+      await resendVerificationCode();
       toast.current?.show('Nouveau code envoyé ✅');
-      setTimeLeft(OTP_EXPIRATION / 1000);
+      setTimeLeft(300);
       setCanResend(false);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
@@ -162,64 +147,64 @@ export default function OtpScreen({ route, navigation }) {
 
             {/* Contenu principal */}
             <View style={styles.content}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="shield-checkmark" size={48} color="white" />
-          </View>
+              <View style={styles.iconContainer}>
+                <Ionicons name="shield-checkmark" size={48} color="white" />
+              </View>
 
-          <Text style={styles.title}>Vérification OTP</Text>
-          <Text style={styles.subtitle}>
-            Nous avons envoyé un code à 6 chiffres par {contactType}
-          </Text>
-          <Text style={styles.contactInfo}>{contactInfo}</Text>
-
-          {/* Champs de saisie OTP */}
-          <View style={styles.otpContainer}>
-            {code.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => (inputRefs.current[index] = ref)}
-                style={styles.otpInput}
-                value={digit}
-                onChangeText={(text) => handleCodeChange(text, index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                keyboardType="numeric"
-                maxLength={1}
-                selectTextOnFocus
-                textAlign="center"
-                autoFocus={index === 0}
-              />
-            ))}
-          </View>
-
-          {/* Bouton de vérification */}
-          <Button
-            title="Vérifier"
-            variant="secondary"
-            onPress={handleVerify}
-            loading={loading}
-            disabled={loading || code.join('').length !== 6}
-            size="large"
-            fullWidth
-            style={styles.verifyButton}
-          />
-
-          {/* Compte à rebours et renvoi */}
-          <View style={styles.resendContainer}>
-            {!canResend ? (
-              <Text style={styles.timerText}>
-                Renvoyer dans {formatTime(timeLeft)}
+              <Text style={styles.title}>Vérification OTP</Text>
+              <Text style={styles.subtitle}>
+                Nous avons envoyé un code à 6 chiffres par {contactType}
               </Text>
-            ) : (
+              <Text style={styles.contactInfo}>{contactInfo}</Text>
+
+              {/* Champs de saisie OTP */}
+              <View style={styles.otpContainer}>
+                {code.map((digit, index) => (
+                  <TextInput
+                    key={index}
+                    ref={(ref) => (inputRefs.current[index] = ref)}
+                    style={styles.otpInput}
+                    value={digit}
+                    onChangeText={(text) => handleCodeChange(text, index)}
+                    onKeyPress={(e) => handleKeyPress(e.nativeEvent.key, index)}
+                    keyboardType="numeric"
+                    maxLength={1}
+                    selectTextOnFocus
+                    textAlign="center"
+                    autoFocus={index === 0}
+                  />
+                ))}
+              </View>
+
+              {/* Bouton de vérification */}
               <Button
-                title="Renvoyer le code"
-                variant="tertiary"
-                onPress={handleResend}
-                loading={resendLoading}
-                disabled={resendLoading}
-                style={styles.resendButton}
+                title="Vérifier"
+                variant="secondary"
+                onPress={handleVerify}
+                loading={loading}
+                disabled={loading || code.join('').length !== 6}
+                size="large"
+                fullWidth
+                style={styles.verifyButton}
               />
-            )}
-          </View>
+
+              {/* Compte à rebours et renvoi */}
+              <View style={styles.resendContainer}>
+                {!canResend ? (
+                  <Text style={styles.timerText}>
+                    Renvoyer dans {formatTime(timeLeft)}
+                  </Text>
+                ) : (
+                  <Button
+                    title="Renvoyer le code"
+                    variant="tertiary"
+                    onPress={handleResend}
+                    loading={resendLoading}
+                    disabled={resendLoading}
+                    style={styles.resendButton}
+                  />
+                )}
+              </View>
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
@@ -301,12 +286,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-  otpText: {
-    ...textStyles.h2,
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
   },
   verifyButton: {
     marginBottom: spacing.lg,

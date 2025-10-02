@@ -49,14 +49,20 @@ export default function SignupScreen({ navigation }) {
     ]).start();
   }, []);
 
-  const onSubmit = async (data) => {
+   const onSubmit = async (data) => {
     try {
-      await register(data);
+      const result = await register(data);
       toast.show('Compte créé avec succès ✅');
-      navigation.replace('MainTabs');
+      
+      // Naviguer vers l'écran OTP avec les paramètres nécessaires
+      navigation.navigate('Otp', {
+        email: data.email,
+        phone: data.phone,
+        purpose: 'ACCOUNT_VERIFICATION',
+        token: result.confirmationToken
+      });
     } catch (e) {
       toast.show(e.message || 'Erreur lors de la création du compte');
-      console.log("erreur:",e)
     }
   };
 

@@ -150,7 +150,7 @@ export default function HomeScreen({ navigation }) {
             <View style={s.heroImageContainer}>
               <View style={s.medicalIcon}>
                 <Image 
-                  source={require('../../../assets/Logo/Fichier 4.png')} 
+                  source={require('../../../assets/Logo/Fichier_4.png')} 
                   style={s.heroLogoImage}
                   resizeMode="contain"
                 />

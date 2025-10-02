@@ -24,8 +24,13 @@ const api = axios.create({
 
 // Intercepteur pour ajouter le token
 api.interceptors.request.use(async (cfg) => {
-  const token = await getAuthToken();
-  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  // Utilise le token temporaire si fourni dans la config
+  if (cfg.tempToken) {
+    cfg.headers.Authorization = `Bearer ${cfg.tempToken}`;
+  } else {
+    const token = await getAuthToken();
+    if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  }
   return cfg;
 });
 

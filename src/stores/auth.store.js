@@ -1,27 +1,29 @@
-// src/stores/auth.store.js
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   login as apiLogin, 
   register as apiRegister, 
   me as apiMe,
-  registerWithOtp as apiRegisterWithOtp,
-  loginWithOtp as apiLoginWithOtp
+  confirmAccount as apiConfirmAccount,
+  requestPasswordReset as apiRequestPasswordReset,
+  confirmPasswordReset as apiConfirmPasswordReset,
+  resendVerificationCode as apiResendVerificationCode
 } from '@/services/auth';
-import { verifyOtp } from '@/services/otp';
 
 const useAuthStore = create((set, get) => ({
   token: null,
   user: null,
   loading: false,
+  confirmationToken: null,
+  passwordResetToken: null,
 
   init: async () => {
     const token = await AsyncStorage.getItem('auth_token');
     if (token) {
       set({ token });
       try {
-        const user = await apiMe(token); // me() renvoie directement le profil normalisé
-        set({ user });
+        const { client } = await apiMe(); // me() renvoie { client, access_token }
+        set({ user: client });
       } catch {
         set({ token: null, user: null });
         await AsyncStorage.removeItem('auth_token');
@@ -33,13 +35,11 @@ const useAuthStore = create((set, get) => ({
   login: async (credentials) => {
     set({ loading: true });
     try {
-      const { token } = await apiLogin(credentials); // toujours { token } grâce à la normalisation
-      if (!token) throw new Error("Token manquant à la connexion");
+      const { client, access_token } = await apiLogin(credentials);
+      if (!access_token) throw new Error("Token manquant à la connexion");
 
-      await AsyncStorage.setItem('auth_token', token);
-
-      const user = await apiMe(token); // me() -> profil (client)
-      set({ token, user, loading: false });
+      await AsyncStorage.setItem('auth_token', access_token);
+      set({ token: access_token, user: client, loading: false });
       return true;
     } catch (e) {
       set({ loading: false });
@@ -47,21 +47,46 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // data = { email, password, firstName, lastName, phone? }
+  // data = { email, password, firstName, lastName, phone?, role? }
   register: async (data) => {
     set({ loading: true });
     try {
-      const res = await apiRegister(data); // { ok: true }
-      if (!res?.ok) throw new Error("Échec de la création du compte");
+      const { confim_token } = await apiRegister(data);
+      if (!confim_token) throw new Error("Échec de la création du compte");
+      
+      // Stocke le token de confirmation temporairement
+      await AsyncStorage.setItem('confirm_token', confim_token);
+      set({ confirmationToken: confim_token, loading: false });
+      
+      return { success: true, confirmationToken: confim_token };
+    } catch (e) {
+      set({ loading: false });
+      throw e;
+    }
+  },
 
-      // login immédiat
-      const { token } = await apiLogin({ email: data.email, password: data.password });
-      if (!token) throw new Error("Impossible de récupérer le token après inscription");
-
-      await AsyncStorage.setItem('auth_token', token);
-
-      const user = await apiMe(token);
-      set({ token, user, loading: false });
+  // Vérification du compte avec OTP
+  confirmAccount: async (code) => {
+    set({ loading: true });
+    try {
+      const confirmationToken = get().confirmationToken || 
+        await AsyncStorage.getItem('confirm_token');
+      
+      if (!confirmationToken) throw new Error("Token de confirmation manquant");
+      
+      const { user, access_token } = await apiConfirmAccount(code, confirmationToken);
+      
+      // Stocke le token permanent
+      await AsyncStorage.setItem('auth_token', access_token);
+      await AsyncStorage.removeItem('confirm_token');
+      
+      set({ 
+        token: access_token, 
+        user, 
+        confirmationToken: null, 
+        loading: false 
+      });
+      
       return true;
     } catch (e) {
       set({ loading: false });
@@ -69,55 +94,71 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Inscription avec OTP
-  registerWithOtp: async (data) => {
+  // Demande de réinitialisation de mot de passe
+  requestPasswordReset: async ({ email, phone }) => {
     set({ loading: true });
     try {
-      const result = await apiRegisterWithOtp(data);
-      set({ loading: false });
-      return result; // { ok: true, otpSent: true, otpMessage, expiresIn }
+      const { confim_token } = await apiRequestPasswordReset({ email, phone });
+      if (!confim_token) throw new Error("Échec de la demande de réinitialisation");
+      
+      // Stocke le token de réinitialisation
+      await AsyncStorage.setItem('reset_token', confim_token);
+      set({ passwordResetToken: confim_token, loading: false });
+      
+      return { success: true, resetToken: confim_token };
     } catch (e) {
       set({ loading: false });
       throw e;
     }
   },
 
-  // Connexion avec OTP
-  loginWithOtp: async (credentials) => {
+  // Confirmation de réinitialisation de mot de passe
+  confirmPasswordReset: async (code, newPassword) => {
     set({ loading: true });
     try {
-      const result = await apiLoginWithOtp(credentials);
-      set({ loading: false });
-      return result; // { token, otpSent: true, otpMessage, expiresIn }
+      const resetToken = get().passwordResetToken || 
+        await AsyncStorage.getItem('reset_token');
+      
+      if (!resetToken) throw new Error("Token de réinitialisation manquant");
+      
+      const { user, access_token } = await apiConfirmPasswordReset(code, newPassword, resetToken);
+      
+      // Stocke le nouveau token
+      await AsyncStorage.setItem('auth_token', access_token);
+      await AsyncStorage.removeItem('reset_token');
+      
+      set({ 
+        token: access_token, 
+        user, 
+        passwordResetToken: null, 
+        loading: false 
+      });
+      
+      return true;
     } catch (e) {
       set({ loading: false });
       throw e;
     }
   },
 
-  // Vérification OTP et finalisation de l'authentification
-  verifyOtpAndComplete: async ({ code, purpose, userId, email, password }) => {
+  // Renvoi du code de vérification
+  resendVerificationCode: async () => {
     set({ loading: true });
     try {
-      // 1. Vérifier le code OTP
-      await verifyOtp({ code, purpose, userId });
-
-      // 2. Finaliser la connexion selon le purpose
-      if (purpose === 'SIGNUP') {
-        // Connexion automatique après inscription
-        const { token } = await apiLogin({ email, password });
-        await AsyncStorage.setItem('auth_token', token);
-        const user = await apiMe(token);
-        set({ token, user, loading: false });
-      } else if (purpose === 'LOGIN') {
-        // La connexion est déjà faite, récupérer le profil
-        const token = get().token;
-        if (token) {
-          const user = await apiMe(token);
-          set({ user, loading: false });
-        }
+      const confirmationToken = get().confirmationToken || 
+        await AsyncStorage.getItem('confirm_token');
+      
+      if (!confirmationToken) throw new Error("Token de confirmation manquant");
+      
+      const { confim_token } = await apiResendVerificationCode(confirmationToken);
+      
+      // Met à jour le token si nécessaire
+      if (confim_token !== confirmationToken) {
+        await AsyncStorage.setItem('confirm_token', confim_token);
+        set({ confirmationToken: confim_token });
       }
-
+      
+      set({ loading: false });
       return true;
     } catch (e) {
       set({ loading: false });
@@ -126,8 +167,13 @@ const useAuthStore = create((set, get) => ({
   },
 
   logout: async () => {
-    await AsyncStorage.removeItem('auth_token');
-    set({ token: null, user: null });
+    await AsyncStorage.multiRemove(['auth_token', 'confirm_token', 'reset_token']);
+    set({ 
+      token: null, 
+      user: null, 
+      confirmationToken: null, 
+      passwordResetToken: null 
+    });
   },
 }));
 

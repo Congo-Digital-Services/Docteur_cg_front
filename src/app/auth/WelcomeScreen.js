@@ -169,7 +169,7 @@ export default function WelcomeScreen({ navigation }) {
           >
             <View style={s.logoIconContainer}>
               <Image 
-                source={require('../../../assets/Logo/Fichier 4.png')} 
+                source={require('../../../assets/Logo/Fichier_4.png')} 
                 style={s.logoImage}
                 resizeMode="contain"
               />

@@ -11,12 +11,12 @@ import colors from '../../theme/colors';
 import { textStyles } from '../../theme/typography';
 
 export default function LoginScreen({ navigation }) {
-  const { control, handleSubmit, formState: { errors } } = useForm({ 
-    defaultValues: { email: '', password: '' } 
+  const { control, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: { email: '', password: '' }
   });
   const login = useAuthStore((s) => s.login);
   const loading = useAuthStore((s) => s.loading);
-  
+
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -46,12 +46,16 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPassword');
+  };
+
   return (
-    <KeyboardAvoidingView 
-      style={s.container} 
+    <KeyboardAvoidingView
+      style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -76,9 +80,9 @@ export default function LoginScreen({ navigation }) {
 
           {/* Form */}
           <View style={s.form}>
-            <Controller 
-              control={control} 
-              name="email" 
+            <Controller
+              control={control}
+              name="email"
               rules={{
                 required: 'L\'email est requis',
                 pattern: {
@@ -87,22 +91,22 @@ export default function LoginScreen({ navigation }) {
                 }
               }}
               render={({ field: { onChange, value } }) => (
-                <Input 
+                <Input
                   label="Adresse email"
-                  placeholder="votre@email.com" 
+                  placeholder="votre@email.com"
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoComplete="email"
-                  value={value} 
+                  value={value}
                   onChangeText={onChange}
                   error={errors.email?.message}
                 />
-              )} 
+              )}
             />
-            
-            <Controller 
-              control={control} 
-              name="password" 
+
+            <Controller
+              control={control}
+              name="password"
               rules={{
                 required: 'Le mot de passe est requis',
                 minLength: {
@@ -111,19 +115,27 @@ export default function LoginScreen({ navigation }) {
                 }
               }}
               render={({ field: { onChange, value } }) => (
-                <Input 
+                <Input
                   label="Mot de passe"
-                  placeholder="••••••••" 
-                  secureTextEntry 
-                  value={value} 
+                  placeholder="••••••••"
+                  secureTextEntry
+                  value={value}
                   onChangeText={onChange}
                   error={errors.password?.message}
                 />
-              )} 
+              )}
             />
+            <View style={s.forgotPasswordContainer}>
+              <Text
+                style={s.forgotPasswordText}
+                onPress={handleForgotPassword}
+              >
+                Mot de passe oublié ?
+              </Text>
+            </View>
 
-            <Button 
-              title="Se connecter" 
+            <Button
+              title="Se connecter"
               onPress={handleSubmit(onSubmit)}
               loading={loading}
               fullWidth
@@ -137,8 +149,8 @@ export default function LoginScreen({ navigation }) {
               <View style={s.dividerLine} />
             </View>
 
-            <Button 
-              title="Continuer en tant qu'invité" 
+            <Button
+              title="Continuer en tant qu'invité"
               variant="secondary"
               onPress={() => navigation.replace('MainTabs')}
               fullWidth
@@ -150,7 +162,7 @@ export default function LoginScreen({ navigation }) {
           <View style={s.footer}>
             <Text style={s.footerText}>
               Pas encore de compte ?{' '}
-              <Text 
+              <Text
                 style={s.linkText}
                 onPress={() => navigation.navigate('Signup')}
               >
@@ -235,6 +247,16 @@ const s = StyleSheet.create({
     color: colors.textSecondary,
   },
   linkText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  forgotPasswordText: {
+    ...textStyles.bodySmall,
     color: colors.primary,
     fontWeight: '600',
   },
