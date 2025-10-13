@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Image, Modal, Dimensions, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Image, Modal, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +8,6 @@ import Card from '../../components/Card';
 import { colors, spacing, radius, textStyles } from '../../theme';
 import useDoctorStore from '../../stores/useDoctorStore';
 import useBookingStore from '../../stores/booking.store';
-import useAuthStore from '../../stores/auth.store';
 import { useRoute, useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
@@ -25,22 +24,14 @@ export default function DoctorDetailsScreen({ navigation }) {
     getDoctorDetails 
   } = useDoctorStore();
   
-  // Utilisation du store des rendez-vous
-  const { 
-    selectDoctor,
-    slots,
-    slotsLoading,
-    slotsError,
-    loadSlots
+  // Utilisation du store de réservation
+  const {
+    selectDoctor
   } = useBookingStore();
-  
-  // Utilisation du store d'authentification
-  const { token } = useAuthStore();
   
   // State pour les modales
   const [modalVisible, setModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -67,33 +58,11 @@ export default function DoctorDetailsScreen({ navigation }) {
     ]).start();
   }, [doctorId]);
 
-  useEffect(() => {
-    // Charger les créneaux disponibles lorsque le médecin est sélectionné
-    if (selectedDoctor && selectedDate) {
-      loadSlots(selectedDoctor.id, selectedDate.toISOString().split('T')[0]);
-    }
-  }, [selectedDoctor, selectedDate]);
-
   const handleBookAppointment = () => {
-    if (!token) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez vous connecter pour prendre rendez-vous.',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => navigation.navigate('Auth', { screen: 'Login' }) },
-        ]
-      );
-      return;
+    if (selectedDoctor) {
+      selectDoctor(selectedDoctor);
+      navigation.navigate('Booking', { doctorId });
     }
-    
-    // Sélectionner le médecin et naviguer vers l'écran de réservation
-    selectDoctor(selectedDoctor);
-    navigation.navigate('Booking', { doctorId });
-  };
-
-  const handleDateSelect = (date) => {
-    setSelectedDate(date);
   };
 
   const showModal = (content) => {
@@ -136,110 +105,40 @@ export default function DoctorDetailsScreen({ navigation }) {
   }
 
   // Extraction des données du médecin selon la structure du backend
-  const { user, doctor } = selectedDoctor;
-  const fullName = `${user.firstName} ${user.lastName}`;
-  const profilePic = doctor?.profileFilename 
-    ? { uri: `${process.env.API_URL}/uploads/${doctor.profileFilename}` }
+  // CORRECTION: Les données sont directement dans l'objet racine, pas dans un objet user
+  const fullName = `${selectedDoctor?.firstName || ''} ${selectedDoctor?.lastName || ''}`.trim();
+  const profilePic = selectedDoctor?.doctor?.profileFilename 
+    ? { uri: `${process.env.API_URL}/uploads/${selectedDoctor.doctor.profileFilename}` }
     : null;
   
   // Extraction des spécialisations
-  const specializations = doctor?.specializations?.map(spec => spec.skill?.name) || [];
+  const specializations = selectedDoctor?.doctor?.specializations?.map(spec => spec.skill?.name) || [];
   
   // Extraction des tarifs
-  const pricings = doctor?.pricings || [];
+  const pricings = selectedDoctor?.doctor?.pricings || [];
   
   // Extraction des horaires
-  const openingHours = doctor?.openingHours || [];
+  const openingHours = selectedDoctor?.doctor?.openingHours || [];
   
-  // Extraction de la localisation
-  const location = doctor?.map_pin || {};
-
-  const renderSpecialtyItem = ({ item }) => (
-    <View style={s.tag}>
-      <Text style={s.tagText}>{item}</Text>
-    </View>
-  );
-
-  const renderPricingItem = ({ item }) => (
-    <View style={s.pricingItem}>
-      <Text style={s.pricingLabel}>
-        {item.baseFee && 'Consultation: '}
-        {item.followUpFee && 'Suivi: '}
-        {item.teleconsultFee && 'Téléconsultation: '}
-        {item.homeVisitFee && 'Visite à domicile: '}
-      </Text>
-      <Text style={s.pricingValue}>
-        {item.baseFee || item.followUpFee || item.teleconsultFee || item.homeVisitFee} {item.currency}
-      </Text>
-    </View>
-  );
-
-  const renderOpeningHourItem = ({ item }) => (
-    <View style={s.scheduleItem}>
-      <Text style={s.scheduleDay}>{item.day}</Text>
-      <Text style={s.scheduleTime}>
-        {item.isClosed ? 'Fermé' : `${item.openHour} - ${item.closeHour}`}
-      </Text>
-    </View>
-  );
-
-  const renderSlotItem = ({ item }) => (
-    <Pressable 
-      style={s.slotItem}
-      onPress={() => {
-        // Naviguer vers l'écran de réservation avec le créneau sélectionné
-        selectDoctor(selectedDoctor);
-        navigation.navigate('Booking', { 
-          doctorId, 
-          selectedSlot: item,
-          selectedDate: selectedDate.toISOString().split('T')[0]
-        });
-      }}
-    >
-      <Text style={s.slotTime}>
-        {new Date(item.startsAt).toLocaleTimeString('fr-FR', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })}
-      </Text>
-    </Pressable>
-  );
-
-  // Générer les dates pour les 7 prochains jours
-  const generateDates = () => {
-    const dates = [];
-    const today = new Date();
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date);
+  // Extraction de la localisation (map_pin est une chaîne JSON)
+  let location = {};
+  try {
+    if (selectedDoctor?.doctor?.map_pin) {
+      location = typeof selectedDoctor.doctor.map_pin === 'string' 
+        ? JSON.parse(selectedDoctor.doctor.map_pin) 
+        : selectedDoctor.doctor.map_pin;
     }
-    
-    return dates;
-  };
+  } catch (e) {
+    console.error("Erreur lors du parsing de map_pin:", e);
+    location = {};
+  }
 
-  const renderDateItem = ({ item }) => {
-    const isSelected = selectedDate.toDateString() === item.toDateString();
-    const isToday = item.toDateString() === new Date().toDateString();
-    
-    return (
-      <Pressable
-        style={[s.dateItem, isSelected && s.dateItemSelected]}
-        onPress={() => handleDateSelect(item)}
-      >
-        <Text style={[s.dateDay, isSelected && s.dateTextSelected]}>
-          {item.toLocaleDateString('fr-FR', { weekday: 'short' }).toUpperCase()}
-        </Text>
-        <Text style={[s.dateNumber, isSelected && s.dateTextSelected]}>
-          {item.getDate()}
-        </Text>
-        {isToday && (
-          <View style={s.todayIndicator} />
-        )}
-      </Pressable>
-    );
-  };
+  // DEBUG: Afficher les données extraites pour vérification
+  // console.log("Nom complet:", fullName);
+  // console.log("Spécialisations:", specializations);
+  // console.log("Biographie:", selectedDoctor?.doctor?.biography);
+  // console.log("Horaires:", openingHours);
+  // console.log("Tarifs:", pricings);
 
   return (
     <View style={s.container}>
@@ -283,19 +182,31 @@ export default function DoctorDetailsScreen({ navigation }) {
             </View>
             <Text style={s.doctorName}>{fullName}</Text>
             
-            {/* Affichage des spécialisations */}
+            {/* Affichage des spécialisations avec un simple map au lieu de FlatList */}
             {specializations.length > 0 && (
               <View style={s.specialtiesContainer}>
-                <FlatList
-                  data={specializations}
-                  renderItem={renderSpecialtyItem}
-                  keyExtractor={(item, index) => index.toString()}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={s.specialtiesList}
-                />
+                {specializations.map((item, index) => (
+                  <View key={index} style={s.tag}>
+                    <Text style={s.tagText}>{item}</Text>
+                  </View>
+                ))}
               </View>
             )}
+            
+            {/* Affichage du statut de disponibilité */}
+            <View style={s.availabilityContainer}>
+              <View style={[s.availabilityBadge, { backgroundColor: selectedDoctor?.doctor?.isAvailable ? colors.success : colors.textTertiary }]}>
+                <Text style={s.availabilityText}>
+                  {selectedDoctor?.doctor?.isAvailable ? 'Disponible' : 'Indisponible'}
+                </Text>
+              </View>
+              {selectedDoctor?.is_verified && (
+                <View style={s.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                  <Text style={s.verifiedText}>Vérifié</Text>
+                </View>
+              )}
+            </View>
             
             <View style={s.bookButtonContainer}>
               <Button
@@ -307,63 +218,6 @@ export default function DoctorDetailsScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Section Créneaux disponibles */}
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <View style={s.sectionIcon}>
-                <Ionicons name="calendar" size={20} color={colors.primary} />
-              </View>
-              <Text style={s.sectionTitle}>Créneaux disponibles</Text>
-            </View>
-            
-            {/* Sélection de la date */}
-            <View style={s.dateSelectionContainer}>
-              <FlatList
-                data={generateDates()}
-                renderItem={renderDateItem}
-                keyExtractor={(item) => item.toISOString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.dateList}
-              />
-            </View>
-            
-            {/* Affichage des créneaux */}
-            {slotsLoading ? (
-              <View style={s.slotsLoadingContainer}>
-                <Text style={s.slotsLoadingText}>Chargement des créneaux...</Text>
-              </View>
-            ) : slotsError ? (
-              <View style={s.slotsErrorContainer}>
-                <Text style={s.slotsErrorText}>{slotsError}</Text>
-                <Button
-                  title="Réessayer"
-                  onPress={() => loadSlots(selectedDoctor.id, selectedDate.toISOString().split('T')[0])}
-                  variant="outline"
-                  size="small"
-                />
-              </View>
-            ) : slots.length > 0 ? (
-              <View style={s.slotsContainer}>
-                <FlatList
-                  data={slots}
-                  renderItem={renderSlotItem}
-                  keyExtractor={(item) => item.id}
-                  numColumns={3}
-                  scrollEnabled={false}
-                  contentContainerStyle={s.slotsList}
-                />
-              </View>
-            ) : (
-              <View style={s.noSlotsContainer}>
-                <Ionicons name="calendar-outline" size={48} color={colors.textTertiary} />
-                <Text style={s.noSlotsText}>
-                  Aucun créneau disponible pour cette date
-                </Text>
-              </View>
-            )}
-          </View>
-
           {/* Section Présentation */}
           <View style={s.section}>
             <View style={s.sectionHeader}>
@@ -371,69 +225,11 @@ export default function DoctorDetailsScreen({ navigation }) {
                 <Ionicons name="person" size={20} color={colors.primary} />
               </View>
               <Text style={s.sectionTitle}>Présentation</Text>
-              <Pressable 
-                style={s.seeMoreButton}
-                onPress={() => showModal({
-                  title: 'Présentation',
-                  content: (
-                    <View>
-                      <Text style={s.presentationText}>
-                        {doctor?.biography || 'Aucune biographie disponible.'}
-                      </Text>
-                    </View>
-                  )
-                })}
-              >
-                <Text style={s.seeMoreText}>Voir plus</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-              </Pressable>
             </View>
             <Text style={s.presentationText}>
-              {doctor?.biography ? 
-                (doctor.biography.length > 150 ? 
-                  `${doctor.biography.substring(0, 150)}...` : 
-                  doctor.biography
-                ) : 
-                'Aucune biographie disponible.'
-              }
+              {selectedDoctor?.doctor?.biography || 'Aucune biographie disponible.'}
             </Text>
           </View>
-
-          {/* Section Tarifs */}
-          {pricings.length > 0 && (
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <View style={s.sectionIcon}>
-                  <Ionicons name="card" size={20} color={colors.primary} />
-                </View>
-                <Text style={s.sectionTitle}>Tarifs</Text>
-                <Pressable 
-                  style={s.seeMoreButton}
-                  onPress={() => showModal({
-                    title: 'Tarifs',
-                    content: (
-                      <View>
-                        <FlatList
-                          data={pricings}
-                          renderItem={renderPricingItem}
-                          keyExtractor={(item) => item.id}
-                        />
-                      </View>
-                    )
-                  })}
-                >
-                  <Text style={s.seeMoreText}>Voir plus</Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </Pressable>
-              </View>
-              <FlatList
-                data={pricings.slice(0, 2)} // Afficher seulement les 2 premiers tarifs
-                renderItem={renderPricingItem}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
-            </View>
-          )}
 
           {/* Section Horaires */}
           {openingHours.length > 0 && (
@@ -442,34 +238,61 @@ export default function DoctorDetailsScreen({ navigation }) {
                 <View style={s.sectionIcon}>
                   <Ionicons name="time" size={20} color={colors.primary} />
                 </View>
-                <Text style={s.sectionTitle}>Horaires</Text>
-                <Pressable 
-                  style={s.seeMoreButton}
-                  onPress={() => showModal({
-                    title: 'Horaires',
-                    content: (
-                      <View>
-                        <FlatList
-                          data={openingHours}
-                          renderItem={renderOpeningHourItem}
-                          keyExtractor={(item) => item.id}
-                        />
-                      </View>
-                    )
-                  })}
-                >
-                  <Text style={s.seeMoreText}>Voir plus</Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </Pressable>
+                <Text style={s.sectionTitle}>Horaires d'ouverture</Text>
               </View>
-              <FlatList
-                data={openingHours.slice(0, 3)} // Afficher seulement les 3 premiers horaires
-                renderItem={renderOpeningHourItem}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
+              {openingHours.slice(0, 5).map((item) => {
+                const formatTime = (minutes) => {
+                  const hours = Math.floor(minutes);
+                  const mins = Math.floor((minutes - hours) * 60);
+                  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+                };
+                
+                const daysOfWeek = {
+                  'MON': 'Lundi',
+                  'TUE': 'Mardi',
+                  'WED': 'Mercredi',
+                  'THU': 'Jeudi',
+                  'FRI': 'Vendredi',
+                  'SAT': 'Samedi',
+                  'SUN': 'Dimanche'
+                };
+                const dayName = daysOfWeek[item.day] || 'Jour inconnu';
+                
+                return (
+                  <View key={item.id} style={s.scheduleItem}>
+                    <Text style={s.scheduleDay}>{dayName}</Text>
+                    <Text style={s.scheduleTime}>
+                      {item.isClosed ? 'Fermé' : `${formatTime(item.openHour)} - ${formatTime(item.closeHour)}`}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           )}
+
+          {/* Section Contact */}
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <View style={s.sectionIcon}>
+                <Ionicons name="call" size={20} color={colors.primary} />
+              </View>
+              <Text style={s.sectionTitle}>Contact</Text>
+            </View>
+            <View style={s.contactContainer}>
+              {selectedDoctor?.phone && (
+                <View style={s.contactItem}>
+                  <Ionicons name="call" size={16} color={colors.textSecondary} />
+                  <Text style={s.contactText}>{selectedDoctor.phone}</Text>
+                </View>
+              )}
+              {selectedDoctor?.email && (
+                <View style={s.contactItem}>
+                  <Ionicons name="mail" size={16} color={colors.textSecondary} />
+                  <Text style={s.contactText}>{selectedDoctor.email}</Text>
+                </View>
+              )}
+            </View>
+          </View>
 
           {/* Section Localisation */}
           <View style={s.section}>
@@ -485,17 +308,14 @@ export default function DoctorDetailsScreen({ navigation }) {
                   <Ionicons name="map" size={48} color={colors.primaryMuted} />
                   <Text style={s.mapPlaceholderText}>Carte de localisation</Text>
                   <Text style={s.mapPlaceholderSubtext}>
-                    {location.address || 'Adresse non spécifiée'}
+                    {location.lat && location.lon 
+                      ? `Coordonnées: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}`
+                      : 'Coordonnées non spécifiées'
+                    }
                   </Text>
                 </View>
                 <View style={s.markerContainer}>
                   <Ionicons name="medical" size={24} color="white" />
-                </View>
-              </View>
-              <View style={s.mapOverlay}>
-                <View style={s.mapInfo}>
-                  <Text style={s.mapTitle}>{location.name || 'Cabinet médical'}</Text>
-                  <Text style={s.mapAddress}>{location.address || 'Adresse non spécifiée'}</Text>
                 </View>
               </View>
             </View>
@@ -508,22 +328,15 @@ export default function DoctorDetailsScreen({ navigation }) {
                 <Ionicons name="information-circle" size={20} color={colors.primary} />
               </View>
               <Text style={s.sectionTitle}>Informations légales</Text>
-              <Pressable 
-                style={s.seeMoreButton}
-                onPress={() => showModal({
-                  title: 'Informations légales',
-                  content: (
-                    <View>
-                      <Text style={s.infoItem}>Numéro de licence: {doctor?.licenceNumber || 'Non spécifié'}</Text>
-                      <Text style={s.infoItem}>Assurance responsabilité civile</Text>
-                      <Text style={s.infoItem}>Conseil de l'Ordre des Médecins</Text>
-                    </View>
-                  )
-                })}
-              >
-                <Text style={s.seeMoreText}>Voir plus</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-              </Pressable>
+            </View>
+            <View style={s.legalInfoContainer}>
+              <Text style={s.infoItem}>Numéro de licence: {selectedDoctor?.doctor?.licenceNumber || 'Non spécifié'}</Text>
+              {selectedDoctor?.doctor?.medicalIdFilename && (
+                <View style={s.documentItem}>
+                  <Ionicons name="document-text" size={16} color={colors.textSecondary} />
+                  <Text style={s.documentText}>Document médical vérifié</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -555,9 +368,7 @@ export default function DoctorDetailsScreen({ navigation }) {
   );
 }
 
-// Ajout des nouveaux styles pour les créneaux et dates
 const s = StyleSheet.create({
-  // Styles existants...
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -655,10 +466,10 @@ const s = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   specialtiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     marginBottom: spacing.lg,
-  },
-  specialtiesList: {
-    paddingHorizontal: spacing.lg,
   },
   tag: {
     backgroundColor: colors.primaryMuted,
@@ -666,12 +477,46 @@ const s = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: 20,
     marginRight: spacing.sm,
+    marginBottom: spacing.sm,
   },
   tagText: {
     ...textStyles.bodySmall,
     fontSize: 12,
     fontWeight: '500',
     color: colors.primary,
+  },
+  availabilityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  availabilityBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    marginRight: spacing.sm,
+  },
+  availabilityText: {
+    ...textStyles.bodySmall,
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '500',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.success + '20',
+  },
+  verifiedText: {
+    ...textStyles.bodySmall,
+    fontSize: 12,
+    color: colors.success,
+    marginLeft: spacing.xs,
+    fontWeight: '500',
   },
   bookButtonContainer: {
     width: '100%',
@@ -707,41 +552,11 @@ const s = StyleSheet.create({
     color: colors.text,
     flex: 1,
   },
-  seeMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  seeMoreText: {
-    ...textStyles.body,
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '500',
-    marginRight: spacing.xs,
-  },
   presentationText: {
     ...textStyles.body,
     fontSize: 15,
     color: colors.textSecondary,
     lineHeight: 22,
-    marginBottom: spacing.lg,
-  },
-  pricingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  pricingLabel: {
-    ...textStyles.body,
-    fontSize: 15,
-    color: colors.text,
-  },
-  pricingValue: {
-    ...textStyles.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
   },
   scheduleItem: {
     flexDirection: 'row',
@@ -754,11 +569,26 @@ const s = StyleSheet.create({
     ...textStyles.body,
     fontSize: 15,
     color: colors.text,
+    fontWeight: '500',
   },
   scheduleTime: {
     ...textStyles.body,
     fontSize: 15,
     color: colors.textSecondary,
+  },
+  contactContainer: {
+    marginBottom: spacing.lg,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  contactText: {
+    ...textStyles.body,
+    fontSize: 15,
+    color: colors.text,
+    marginLeft: spacing.sm,
   },
   mapContainer: {
     height: 200,
@@ -793,32 +623,6 @@ const s = StyleSheet.create({
     color: colors.textTertiary,
     textAlign: 'center',
   },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: spacing.md,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  mapInfo: {
-    flex: 1,
-  },
-  mapTitle: {
-    ...textStyles.h4,
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  mapAddress: {
-    ...textStyles.bodySmall,
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
   markerContainer: {
     position: 'absolute',
     top: '50%',
@@ -833,12 +637,26 @@ const s = StyleSheet.create({
     borderColor: 'white',
     transform: [{ translateX: -20 }, { translateY: -20 }],
   },
+  legalInfoContainer: {
+    marginBottom: spacing.lg,
+  },
   infoItem: {
     ...textStyles.body,
     fontSize: 15,
     color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: spacing.sm,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  documentText: {
+    ...textStyles.body,
+    fontSize: 15,
+    color: colors.text,
+    marginLeft: spacing.sm,
   },
   modalOverlay: {
     flex: 1,
@@ -872,100 +690,5 @@ const s = StyleSheet.create({
   modalBody: {
     flex: 1,
     padding: spacing.lg,
-  },
-  
-  // Nouveaux styles pour les créneaux et dates
-  dateSelectionContainer: {
-    marginBottom: spacing.md,
-  },
-  dateList: {
-    paddingRight: spacing.lg,
-  },
-  dateItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 60,
-    height: 70,
-    borderRadius: radius.md,
-    backgroundColor: colors.backgroundSecondary,
-    marginRight: spacing.sm,
-    position: 'relative',
-  },
-  dateItemSelected: {
-    backgroundColor: colors.primary,
-  },
-  dateDay: {
-    ...textStyles.bodySmall,
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  dateNumber: {
-    ...textStyles.h3,
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  dateTextSelected: {
-    color: 'white',
-  },
-  todayIndicator: {
-    position: 'absolute',
-    bottom: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.success,
-  },
-  slotsLoadingContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-  },
-  slotsLoadingText: {
-    ...textStyles.body,
-    color: colors.textSecondary,
-  },
-  slotsErrorContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-  },
-  slotsErrorText: {
-    ...textStyles.body,
-    color: colors.error,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  slotsContainer: {
-    marginBottom: spacing.md,
-  },
-  slotsList: {
-    paddingRight: spacing.lg,
-  },
-  slotItem: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: spacing.xs,
-    marginVertical: spacing.xs,
-    minHeight: 50,
-  },
-  slotTime: {
-    ...textStyles.body,
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  noSlotsContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  noSlotsText: {
-    ...textStyles.body,
-    color: colors.textTertiary,
-    marginTop: spacing.md,
-    textAlign: 'center',
   },
 });

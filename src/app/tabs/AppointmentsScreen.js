@@ -11,7 +11,8 @@ import HeaderGradient from '../../navigation/HeaderGradient';
 import { colors, spacing, radius, textStyles } from '../../theme';
 
 export default function AppointmentsScreen({ navigation }) {
-  const { appointments, loadMine, cancel } = useBookingStore();
+  // CORRECTION : On utilise des alias pour faire correspondre les noms des fonctions du store
+  const { appointments, loadMyAppointments: loadMine, cancelAppointment: cancel } = useBookingStore();
   const { user, token } = useAuthStore();
   
   // États pour la pagination et suppression
@@ -28,8 +29,15 @@ export default function AppointmentsScreen({ navigation }) {
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    console.log('[AppointmentsScreen] useEffect - Token:', token ? 'Présent' : 'Absent');
     if (token) {
-      loadMine();
+      console.log('[AppointmentsScreen] Chargement des rendez-vous...');
+      loadMine().then(response => {
+        console.log('[AppointmentsScreen] Rendez-vous chargés:', response);
+        console.log('[AppointmentsScreen] Nombre de rendez-vous:', appointments.length);
+      }).catch(error => {
+        console.error('[AppointmentsScreen] Erreur lors du chargement des rendez-vous:', error);
+      });
     }
     
     // Animation d'entrée
@@ -48,6 +56,7 @@ export default function AppointmentsScreen({ navigation }) {
   }, [token]);
 
   const handleLoginPress = () => {
+    console.log('[AppointmentsScreen] Navigation vers la page de connexion');
     navigation.navigate('Auth', { screen: 'Login' });
   };
 
@@ -56,47 +65,68 @@ export default function AppointmentsScreen({ navigation }) {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedAppointments = appointments.slice(startIndex, endIndex);
+  
+  console.log('[AppointmentsScreen] Pagination - Page actuelle:', currentPage, 'Total pages:', totalPages);
+  console.log('[AppointmentsScreen] Rendez-vous affichés:', paginatedAppointments.length, 'sur', appointments.length);
 
   // Fonctions de gestion
   const handlePageChange = (page) => {
+    console.log('[AppointmentsScreen] Changement de page vers:', page);
     setCurrentPage(page);
   };
 
   const handleLongPress = (appointment) => {
+    console.log('[AppointmentsScreen] Appui long sur le rendez-vous:', appointment.id);
     setIsSelectionMode(true);
     toggleSelection(appointment.id);
   };
 
   const confirmDelete = () => {
     if (appointmentToDelete) {
-      cancel(appointmentToDelete.id);
-      setDeleteModalVisible(false);
-      setAppointmentToDelete(null);
+      console.log('[AppointmentsScreen] Confirmation de suppression du rendez-vous:', appointmentToDelete.id);
+      cancel(appointmentToDelete.id).then(() => {
+        console.log('[AppointmentsScreen] Rendez-vous supprimé avec succès');
+        setDeleteModalVisible(false);
+        setAppointmentToDelete(null);
+      }).catch(error => {
+        console.error('[AppointmentsScreen] Erreur lors de la suppression du rendez-vous:', error);
+      });
     }
   };
 
   const toggleSelection = (appointmentId) => {
-    setSelectedAppointments(prev => 
-      prev.includes(appointmentId) 
+    console.log('[AppointmentsScreen] Basculement de la sélection pour le rendez-vous:', appointmentId);
+    setSelectedAppointments(prev => {
+      const newSelection = prev.includes(appointmentId) 
         ? prev.filter(id => id !== appointmentId)
-        : [...prev, appointmentId]
-    );
+        : [...prev, appointmentId];
+      console.log('[AppointmentsScreen] Nouvelle sélection:', newSelection);
+      return newSelection;
+    });
   };
 
   const handleBulkDelete = () => {
     if (selectedAppointments.length > 0) {
+      console.log('[AppointmentsScreen] Suppression en masse de', selectedAppointments.length, 'rendez-vous');
       setDeleteModalVisible(true);
     }
   };
 
   const confirmBulkDelete = () => {
-    selectedAppointments.forEach(id => cancel(id));
+    console.log('[AppointmentsScreen] Confirmation de suppression en masse');
+    selectedAppointments.forEach(id => {
+      console.log('[AppointmentsScreen] Suppression du rendez-vous:', id);
+      cancel(id).catch(error => {
+        console.error('[AppointmentsScreen] Erreur lors de la suppression du rendez-vous', id, ':', error);
+      });
+    });
     setSelectedAppointments([]);
     setIsSelectionMode(false);
     setDeleteModalVisible(false);
   };
 
   const exitSelectionMode = () => {
+    console.log('[AppointmentsScreen] Sortie du mode de sélection');
     setIsSelectionMode(false);
     setSelectedAppointments([]);
   };
@@ -121,12 +151,13 @@ export default function AppointmentsScreen({ navigation }) {
 
   const renderAppointmentItem = ({ item }) => {
     const isSelected = selectedAppointments.includes(item.id);
+    console.log('[AppointmentsScreen] Rendu du rendez-vous:', item.id, 'Sélectionné:', isSelected);
 
     const handleCardPress = () => {
       if (isSelectionMode) {
         toggleSelection(item.id);
       } else {
-        // Navigation vers les détails du rendez-vous
+        console.log('[AppointmentsScreen] Navigation vers les détails du rendez-vous:', item.id);
         navigation.navigate('BookingStack', {
           screen: 'AppointmentDetails',
           params: { appointment: item }
@@ -134,7 +165,7 @@ export default function AppointmentsScreen({ navigation }) {
       }
     };
 
-  return (
+    return (
       <Pressable
         onLongPress={() => handleLongPress(item)}
         onPress={handleCardPress}
@@ -143,7 +174,7 @@ export default function AppointmentsScreen({ navigation }) {
           isSelected && s.selectedCard
         ]}
       >
-          <View style={s.card}>
+        <View style={s.card}>
           <View style={s.cardHeader}>
             <View style={s.doctorInfo}>
               <View style={s.doctorAvatar}>
@@ -269,47 +300,50 @@ export default function AppointmentsScreen({ navigation }) {
       </Text>
       <Button 
         title="Prendre un rendez-vous" 
-        onPress={() => navigation.navigate('Search')}
+        onPress={() => {
+          console.log('[AppointmentsScreen] Navigation vers la recherche de médecins');
+          navigation.navigate('Search');
+        }}
         style={s.emptyButton}
       />
     </View>
   );
 
-         const renderGuestState = () => (
-           <View style={s.guestContainer}>
-             <View style={s.calendarIconContainer}>
-               <Svg width="80" height="80" viewBox="0 0 128 128" fill="none">
-                 {/* Calendrier arrière (plus bas + un peu à droite) */}
-                 <Rect x="48" y="48" width="72" height="76" rx="4" fill="#1976D2"/>
-                 <Rect x="48" y="48" width="72" height="20" fill="#0D47A1"/>
-                 <Rect x="60" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
-                 <Rect x="88" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
-                 
-                 {/* Calendrier avant */}
-                 <Rect x="20" y="28" width="72" height="76" rx="4" fill="#29B6F6"/>
-                 <Rect x="20" y="28" width="72" height="20" fill="#1976D2"/>
-                 <Rect x="32" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
-                 <Rect x="68" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
-                 
-                 {/* Jours */}
-                 <Rect x="32" y="56" width="12" height="12" rx="2" fill="#1565C0"/>
-                 <Rect x="52" y="56" width="12" height="12" rx="2" fill="#ffffff"/>
-                 <Rect x="32" y="76" width="12" height="12" rx="2" fill="#ffffff"/>
-                 <Rect x="52" y="76" width="12" height="12" rx="2" fill="#1565C0"/>
-                 <Rect x="72" y="76" width="12" height="12" rx="2" fill="#FBC02D"/>
-               </Svg>
-             </View>
+  const renderGuestState = () => (
+    <View style={s.guestContainer}>
+      <View style={s.calendarIconContainer}>
+        <Svg width="80" height="80" viewBox="0 0 128 128" fill="none">
+          {/* Calendrier arrière (plus bas + un peu à droite) */}
+          <Rect x="48" y="48" width="72" height="76" rx="4" fill="#1976D2"/>
+          <Rect x="48" y="48" width="72" height="20" fill="#0D47A1"/>
+          <Rect x="60" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+          <Rect x="88" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+          
+          {/* Calendrier avant */}
+          <Rect x="20" y="28" width="72" height="76" rx="4" fill="#29B6F6"/>
+          <Rect x="20" y="28" width="72" height="20" fill="#1976D2"/>
+          <Rect x="32" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+          <Rect x="68" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+          
+          {/* Jours */}
+          <Rect x="32" y="56" width="12" height="12" rx="2" fill="#1565C0"/>
+          <Rect x="52" y="56" width="12" height="12" rx="2" fill="#ffffff"/>
+          <Rect x="32" y="76" width="12" height="12" rx="2" fill="#ffffff"/>
+          <Rect x="52" y="76" width="12" height="12" rx="2" fill="#1565C0"/>
+          <Rect x="72" y="76" width="12" height="12" rx="2" fill="#FBC02D"/>
+        </Svg>
+      </View>
 
-             <Text style={s.guestTitle}>Planifiez vos rendez-vous</Text>
-             <Text style={s.guestSubtitle}>
-               Trouvez un professionnel de la santé et prenez rendez-vous en ligne à tout moment.
-             </Text>
+      <Text style={s.guestTitle}>Planifiez vos rendez-vous</Text>
+      <Text style={s.guestSubtitle}>
+        Trouvez un professionnel de la santé et prenez rendez-vous en ligne à tout moment.
+      </Text>
 
-             <Pressable style={s.connectButton} onPress={handleLoginPress}>
-               <Text style={s.connectButtonText}>SE CONNECTER</Text>
-             </Pressable>
-           </View>
-         );
+      <Pressable style={s.connectButton} onPress={handleLoginPress}>
+        <Text style={s.connectButtonText}>SE CONNECTER</Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <View style={s.container}>
@@ -338,6 +372,11 @@ export default function AppointmentsScreen({ navigation }) {
                 renderItem={renderAppointmentItem}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={s.listContent}
+                onEndReached={() => {
+                  // Implémentation du chargement infini si nécessaire
+                  console.log('[AppointmentsScreen] Fin de la liste atteinte');
+                }}
+                onEndReachedThreshold={0.5}
               />
               {renderPagination()}
             </>
@@ -366,7 +405,10 @@ export default function AppointmentsScreen({ navigation }) {
             <View style={s.modalActions}>
               <Pressable 
                 style={s.modalButtonSecondary} 
-                onPress={() => setDeleteModalVisible(false)}
+                onPress={() => {
+                  console.log('[AppointmentsScreen] Annulation de la suppression');
+                  setDeleteModalVisible(false);
+                }}
               >
                 <Text style={s.modalButtonSecondaryText}>Annuler</Text>
               </Pressable>

@@ -1,20 +1,33 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../../components/Button';
-import { colors, spacing, radius, textStyles } from '../../theme';
+import { colors, spacing, textStyles } from '../../theme';
 import useBookingStore from '../../stores/booking.store';
 
 export default function AppointmentDetailsScreen({ navigation, route }) {
-  const { appointment } = route.params;
-  const { cancel } = useBookingStore();
+  const appointment = route.params?.appointment;
+  const { cancelAppointment: cancel } = useBookingStore();
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    if (!appointment) {
+      console.error("[AppointmentDetailsScreen] Aucun rendez-vous fourni dans les paramètres de navigation.");
+      Alert.alert(
+        "Erreur",
+        "Impossible de charger les détails du rendez-vous.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
+      return;
+    }
+
+    console.log('[AppointmentDetailsScreen] Rendez-vous chargé:', appointment.id, 'Statut:', appointment.status);
+    
+    // Animation d'entrée
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -27,20 +40,38 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [appointment, navigation]);
 
   const handleCancelAppointment = () => {
+    if (!appointment) return;
+
+    console.log('[AppointmentDetailsScreen] Tentative d\'annulation du rendez-vous:', appointment.id);
+    
     Alert.alert(
       'Annuler le rendez-vous',
       'Êtes-vous sûr de vouloir annuler ce rendez-vous ?',
       [
-        { text: 'Non', style: 'cancel' },
+        { 
+          text: 'Non', 
+          style: 'cancel',
+          onPress: () => console.log('[AppointmentDetailsScreen] Annulation de l\'action')
+        },
         { 
           text: 'Oui, annuler', 
           style: 'destructive',
           onPress: () => {
-            cancel(appointment.id);
-            navigation.goBack();
+            console.log('[AppointmentDetailsScreen] Confirmation de l\'annulation du rendez-vous:', appointment.id);
+            cancel(appointment.id).then(() => {
+              console.log('[AppointmentDetailsScreen] Rendez-vous annulé avec succès');
+              navigation.goBack();
+            }).catch(error => {
+              console.error('[AppointmentDetailsScreen] Erreur lors de l\'annulation du rendez-vous:', error);
+              Alert.alert(
+                'Erreur',
+                'Une erreur est survenue lors de l\'annulation. Veuillez réessayer.',
+                [{ text: 'OK' }]
+              );
+            });
           }
         },
       ]
@@ -51,9 +82,10 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
     switch (status) {
       case 'CONFIRMED': return colors.success;
       case 'PENDING': return colors.warning;
-      case 'CANCELLED': return colors.error;
+      case 'CANCELED':
+      case 'CANCELLED': 
       case 'DECLINED': return colors.error;
-      default: return colors.gray;
+      default: return colors.textSecondary;
     }
   };
 
@@ -61,9 +93,41 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
     switch (status) {
       case 'CONFIRMED': return 'Confirmé';
       case 'PENDING': return 'En attente';
+      case 'CANCELED':
       case 'CANCELLED': return 'Annulé';
-      case 'DECLINED': return 'Annulé';
+      case 'DECLINED': return 'Refusé';
       default: return status;
+    }
+  };
+  
+  const handleShareAppointment = () => {
+    console.log('[AppointmentDetailsScreen] Partage du rendez-vous:', appointment?.id);
+    Alert.alert(
+      'Partager le rendez-vous',
+      'Cette fonctionnalité sera bientôt disponible.',
+      [{ text: 'OK' }]
+    );
+  };
+  
+  if (!appointment) {
+    return null; 
+  }
+
+  const formatAppointmentDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Date non disponible';
+      }
+      return date.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("[AppointmentDetailsScreen] Erreur de formatage de date:", error);
+      return 'Date non disponible';
     }
   };
 
@@ -72,12 +136,15 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
       {/* Header avec navigation */}
       <View style={s.header}>
         <View style={s.headerTop}>
-          <Pressable onPress={() => navigation.goBack()} style={s.backButton}>
+          <Pressable 
+            onPress={() => navigation.goBack()} 
+            style={s.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
           <Text style={s.headerTitle}>Détails du rendez-vous</Text>
           <View style={s.headerActions}>
-            <Pressable style={s.headerAction}>
+            <Pressable style={s.headerAction} onPress={handleShareAppointment}>
               <Ionicons name="share-outline" size={24} color="white" />
             </Pressable>
           </View>
@@ -141,12 +208,7 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
                 <View style={s.detailContent}>
                   <Text style={s.detailLabel}>Date</Text>
                   <Text style={s.detailValue}>
-                    {new Date(appointment.date).toLocaleDateString('fr-FR', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                    {formatAppointmentDate(appointment.date)}
                   </Text>
                 </View>
               </View>
@@ -157,7 +219,7 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
                 </View>
                 <View style={s.detailContent}>
                   <Text style={s.detailLabel}>Heure</Text>
-                  <Text style={s.detailValue}>{appointment.time}</Text>
+                  <Text style={s.detailValue}>{appointment.time || 'Heure non disponible'}</Text>
                 </View>
               </View>
 
@@ -180,18 +242,9 @@ export default function AppointmentDetailsScreen({ navigation, route }) {
 
           {/* Actions */}
           <View style={s.actionsSection}>
-            {appointment.status === 'CONFIRMED' && (
+            {(appointment.status === 'CONFIRMED' || appointment.status === 'PENDING') && (
               <Button
-                title="Annuler le rendez-vous"
-                onPress={handleCancelAppointment}
-                icon={<Ionicons name="close-circle" size={20} color="white" />}
-                style={[s.actionButton, s.cancelButton]}
-              />
-            )}
-            
-            {appointment.status === 'PENDING' && (
-              <Button
-                title="Annuler la demande"
+                title={appointment.status === 'CONFIRMED' ? "Annuler le rendez-vous" : "Annuler la demande"}
                 onPress={handleCancelAppointment}
                 icon={<Ionicons name="close-circle" size={20} color="white" />}
                 style={[s.actionButton, s.cancelButton]}

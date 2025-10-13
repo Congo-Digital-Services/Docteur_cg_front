@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { searchDoctors as apiSearchDoctors, getDoctor as apiGetDoctor, getCurrentPosition } from '@/services/doctors';
+import { searchDoctors as apiSearchDoctors, getDoctor as apiGetDoctor } from '@/services/doctors';
 
 const useDoctorStore = create((set, get) => ({
     // État pour la recherche
@@ -10,7 +10,6 @@ const useDoctorStore = create((set, get) => ({
     totalPages: 1,
     total: 0,
     hasMore: true,
-    userLocation: null,
 
     // État pour le détail d'un médecin
     selectedDoctor: null,
@@ -18,8 +17,6 @@ const useDoctorStore = create((set, get) => ({
     doctorError: null,
 
     // Actions
-    setUserLocation: (location) => set({ userLocation: location }),
-
     searchDoctors: async (criteria, resetPage = true) => {
         set({ searchLoading: true, searchError: null });
         if (resetPage) {
@@ -28,17 +25,7 @@ const useDoctorStore = create((set, get) => ({
 
         try {
             const page = resetPage ? 1 : get().currentPage;
-            const userLocation = get().userLocation;
-            
-            // Utiliser la position de l'utilisateur si disponible
-            const searchParams = {
-                ...criteria,
-                page,
-                lat: userLocation?.latitude,
-                lon: userLocation?.longitude
-            };
-
-            const response = await apiSearchDoctors(searchParams);
+            const response = await apiSearchDoctors({ ...criteria, page });
 
             // Le backend retourne un objet avec la structure { total, page, pageSize, results }
             const items = response.results || [];
@@ -86,10 +73,33 @@ const useDoctorStore = create((set, get) => ({
     getDoctorDetails: async (id) => {
         set({ doctorLoading: true, doctorError: null, selectedDoctor: null });
         try {
+            // console.log("Détails du médecin id:", id);
             const doctorData = await apiGetDoctor(id);
+            // console.log("Détails du médecin récupérés:", doctorData);
+
+            // Vérifier si les données sont valides
+            if (!doctorData || !doctorData.doctor) {
+                throw new Error("Données du médecin invalides");
+            }
+
             set({ selectedDoctor: doctorData, doctorLoading: false });
         } catch (error) {
-            set({ doctorError: error.message, doctorLoading: false });
+            let errorMessage = "Une erreur est survenue lors du chargement des détails du médecin.";
+
+            if (error.response) {
+                if (error.response.status >= 500) {
+                    errorMessage = "Le service est temporairement indisponible.";
+                } else if (error.response.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+            } else if (error.request) {
+                errorMessage = "Problème de connexion. Vérifiez votre réseau.";
+            } else {
+                errorMessage = error.message;
+            }
+
+            console.error("Erreur dans getDoctorDetails:", errorMessage);
+            set({ doctorError: errorMessage, doctorLoading: false });
         }
     },
 
@@ -106,17 +116,6 @@ const useDoctorStore = create((set, get) => ({
             hasMore: true,
             searchError: null
         });
-    },
-
-    initializeLocation: async () => {
-        try {
-            const location = await getCurrentPosition();
-            set({ userLocation: location });
-            return location;
-        } catch (error) {
-            console.error("Erreur lors de l'initialisation de la localisation:", error);
-            return null;
-        }
     },
 }));
 

@@ -114,7 +114,7 @@ export default function SearchScreen({ navigation }) {
     
     navigation.navigate('BookingStack', { 
       screen: 'DoctorDetails', 
-      params: { doctorId: doctor.id } 
+      params: { doctorId: doctor.user.id } 
     });
   };
 

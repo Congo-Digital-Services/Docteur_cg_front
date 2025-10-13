@@ -1,14 +1,12 @@
 import api from './apiClient';
 
 /**
- * Récupère tous les rendez-vous du patient connecté
+ * Récupère les rendez-vous du patient connecté.
  * Correspond à l'endpoint GET /user/patient/appointment
  */
 export async function getMyAppointments(params = {}) {
   try {
     const queryParams = new URLSearchParams();
-    
-    // Ajout des paramètres de pagination
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.pageSize) queryParams.append('pageSize', params.pageSize.toString());
     if (params.order) queryParams.append('order', params.order);
@@ -22,11 +20,14 @@ export async function getMyAppointments(params = {}) {
 }
 
 /**
- * Récupère les détails d'un rendez-vous spécifique
+ * Récupère les détails d'un rendez-vous spécifique.
  * Correspond à l'endpoint GET /user/patient/appointment/:id
  */
-export async function getAppointmentDetails(id) {
+export async function getAppointment(id) {
   try {
+    if (!id) {
+      throw new Error("L'ID du rendez-vous est requis.");
+    }
     const res = await api.get(`/user/patient/appointment/${id}`);
     return res.data;
   } catch (error) {
@@ -36,7 +37,7 @@ export async function getAppointmentDetails(id) {
 }
 
 /**
- * Crée un nouveau rendez-vous
+ * Crée un nouveau rendez-vous.
  * Correspond à l'endpoint POST /user/patient/appointment
  */
 export async function createAppointment(appointmentData) {
@@ -47,11 +48,10 @@ export async function createAppointment(appointmentData) {
     console.error("Erreur lors de la création du rendez-vous:", error);
     
     // Gestion des erreurs spécifiques
-    if (error.response?.status === 400) {
-      const errorMessage = error.response.data?.message || 'Données invalides';
-      throw new Error(errorMessage);
-    } else if (error.response?.status === 409) {
-      throw new Error('Ce créneau est déjà réservé. Veuillez choisir un autre créneau.');
+    if (error.response?.status === 409) {
+      const err = new Error('Créneau déjà pris. Essayez un autre créneau.');
+      err.code = 'SLOT_TAKEN';
+      throw err;
     }
     
     throw error;
@@ -59,11 +59,14 @@ export async function createAppointment(appointmentData) {
 }
 
 /**
- * Met à jour un rendez-vous existant
+ * Met à jour un rendez-vous existant.
  * Correspond à l'endpoint PATCH /user/patient/appointment
  */
 export async function updateAppointment(appointmentData) {
   try {
+    if (!appointmentData.id) {
+      throw new Error("L'ID du rendez-vous est requis.");
+    }
     const res = await api.patch('/user/patient/appointment', appointmentData);
     return res.data;
   } catch (error) {
@@ -73,15 +76,18 @@ export async function updateAppointment(appointmentData) {
 }
 
 /**
- * Annule un rendez-vous
+ * Annule un rendez-vous.
  * Correspond à l'endpoint DELETE /user/patient/appointment/:id
  */
 export async function cancelAppointment(id) {
   try {
+    if (!id) {
+      throw new Error("L'ID du rendez-vous est requis.");
+    }
     const res = await api.delete(`/user/patient/appointment/${id}`);
     return res.data;
   } catch (error) {
-    console.error(`Erreur lors de l'annulation du rendez-vous ${id}:`, error);
+    console.error("Erreur lors de l'annulation du rendez-vous:", error);
     throw error;
   }
 }

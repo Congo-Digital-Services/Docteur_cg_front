@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Alert } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated, Pressable, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,18 +8,46 @@ import Card from '../../components/Card';
 import { colors, spacing, radius, textStyles } from '../../theme';
 import useBookingStore from '../../stores/booking.store';
 import useAuthStore from '../../stores/auth.store';
+import useDoctorStore from '../../stores/useDoctorStore';
 
 export default function BookingScreen({ navigation, route }) {
-  const { doctor } = route.params || {};
+  const { doctorId } = route.params || {};
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
+  const [bookingError, setBookingError] = useState(null);
   const { token } = useAuthStore();
+  
+  // CORRECTION: On lit les données du médecin depuis le bon store
+  const { 
+    selectedDoctor, 
+    doctorLoading, 
+    doctorError,
+    getDoctorDetails 
+  } = useDoctorStore();
+  
+  // On garde les fonctions de réservation depuis le booking store
+  const { 
+    selectDoctor,
+    bookAppointment
+  } = useBookingStore();
+  
+  // État local pour les créneaux générés
+  const [generatedSlots, setGeneratedSlots] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => {
+  // CORRECTION: Utiliser useCallback pour stabiliser la fonction et éviter les boucles
+  const initializeScreen = useCallback(() => {
+    // On n'initialise que si on a un ID et que ce n'est pas déjà fait
+    if (!doctorId || isInitialized) return;
+    
+    console.log("[BookingScreen] Initialisation avec doctorId:", doctorId);
+    setIsInitialized(true);
+    
+    // Animation d'entrée
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -32,57 +60,163 @@ export default function BookingScreen({ navigation, route }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
-
-  // Générer les dates disponibles (7 prochains jours)
-  const generateAvailableDates = () => {
-    const dates = [];
-    const today = new Date();
     
+    // Charger les détails du médecin
+    console.log("[BookingScreen] Chargement des détails du médecin...");
+    getDoctorDetails(doctorId);
+  }, [doctorId, isInitialized, getDoctorDetails]);
+
+  // 1. useEffect pour déclencher l'initialisation une seule fois
+  useEffect(() => {
+    initializeScreen();
+  }, [initializeScreen]);
+
+  // 2. useEffect pour traiter les données une fois qu'elles sont disponibles
+  useEffect(() => {
+    if (selectedDoctor) {
+      console.log("[BookingScreen] selectedDoctor est maintenant disponible, traitement des données...");
+      
+      // On place le médecin dans le store de réservation pour le processus
+      selectDoctor(selectedDoctor);
+      
+      const openingHours = selectedDoctor.doctor?.openingHours || [];
+      console.log("[BookingScreen] Heures d'ouverture trouvées:", openingHours);
+      generateSlotsFromOpeningHours(openingHours);
+    }
+    // CORRECTION: On ne réinitialise plus les créneaux si selectedDoctor devient undefined
+  }, [selectedDoctor, selectDoctor]);
+
+  // Générer les créneaux à partir des heures d'ouverture
+  const generateSlotsFromOpeningHours = (openingHours) => {
+    console.log("[generateSlots] Début de la génération des créneaux avec:", openingHours);
+    
+    if (!openingHours || openingHours.length === 0) {
+      console.log("[generateSlots] Aucune heure d'ouverture, aucun créneau généré.");
+      setGeneratedSlots([]);
+      return;
+    }
+
+    const daysOfWeek = {
+      'MON': 'Lun', 'TUE': 'Mar', 'WED': 'Mer', 'THU': 'Jeu',
+      'FRI': 'Ven', 'SAT': 'Sam', 'SUN': 'Dim'
+    };
+
+    const today = new Date();
+    const slots = [];
+
+    // Générer les créneaux pour les 7 prochains jours
     for (let i = 1; i <= 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      dates.push({
-        date: date,
-        day: date.toLocaleDateString('fr-FR', { weekday: 'short' }),
-        dayNumber: date.getDate(),
-        month: date.toLocaleDateString('fr-FR', { month: 'short' }),
-        available: Math.random() > 0.2, // 80% de chance d'être disponible
-      });
+      
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      const dayNumber = date.getDate();
+      const month = date.toLocaleDateString('fr-FR', { month: 'short' });
+      
+      // Trouver les heures d'ouverture pour ce jour
+      const dayOpeningHours = openingHours.find(oh => oh.day === dayName);
+      
+      if (dayOpeningHours && !dayOpeningHours.isClosed) {
+        console.log(`[generateSlots] Génération pour ${dayName}: ${dayOpeningHours.openHour} - ${dayOpeningHours.closeHour}`);
+        
+        // CORRECTION: Gérer correctement les heures décimales (ex: 17.5 = 17:30)
+        const openHour = Math.floor(dayOpeningHours.openHour);
+        const openMinute = (dayOpeningHours.openHour % 1) * 60;
+        const closeHour = Math.floor(dayOpeningHours.closeHour);
+        const closeMinute = (dayOpeningHours.closeHour % 1) * 60;
+        
+        // Convertir en minutes pour faciliter les calculs
+        const openMinutes = openHour * 60 + openMinute;
+        const closeMinutes = closeHour * 60 + closeMinute;
+        
+        // Générer des créneaux de 30 minutes
+        for (let minutes = openMinutes; minutes < closeMinutes; minutes += 30) {
+          const hours = Math.floor(minutes / 60);
+          const mins = minutes % 60;
+          const timeString = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+          
+          slots.push({
+            id: `${dayOpeningHours.id}-${minutes}`,
+            date: date.toISOString().split('T')[0], // Format YYYY-MM-DD
+            dayName: daysOfWeek[dayName] || dayName,
+            dayNumber: dayNumber,
+            month: month,
+            time: timeString,
+            timeMinutes: minutes,
+            available: true
+          });
+        }
+      } else {
+        console.log(`[generateSlots] Pas d'heures d'ouverture ou fermé pour ${dayName}`);
+      }
     }
-    return dates;
-  };
-
-  // Générer les créneaux horaires
-  const generateTimeSlots = () => {
-    const slots = [];
-    const startHour = 9;
-    const endHour = 17;
     
-    for (let hour = startHour; hour < endHour; hour++) {
-      slots.push({
-        time: `${hour.toString().padStart(2, '0')}:00`,
-        available: Math.random() > 0.3, // 70% de chance d'être disponible
-      });
-      slots.push({
-        time: `${hour.toString().padStart(2, '0')}:30`,
-        available: Math.random() > 0.3,
-      });
-    }
-    return slots;
+    console.log("[generateSlots] Total des créneaux générés:", slots.length);
+    setGeneratedSlots(slots);
   };
 
-  const availableDates = generateAvailableDates();
-  const timeSlots = generateTimeSlots();
+  // Grouper les créneaux par date
+  const groupSlotsByDate = useCallback(() => {
+    const groupedSlots = {};
+    
+    // CORRECTION: Vérifier que generatedSlots est bien un tableau
+    if (!Array.isArray(generatedSlots) || generatedSlots.length === 0) {
+      console.log("[groupSlotsByDate] Aucun créneau à grouper");
+      return [];
+    }
+    
+    generatedSlots.forEach(slot => {
+      // CORRECTION: Vérifier que slot et slot.date existent pour éviter l'erreur
+      if (!slot || !slot.date) {
+        console.error("[groupSlotsByDate] Créneau invalide:", slot);
+        return;
+      }
+      
+      if (!groupedSlots[slot.date]) {
+        groupedSlots[slot.date] = {
+          date: slot.date,
+          dayName: slot.dayName,
+          dayNumber: slot.dayNumber,
+          month: slot.month,
+          slots: []
+        };
+      }
+      groupedSlots[slot.date].slots.push(slot);
+    });
+    
+    const grouped = Object.values(groupedSlots);
+    console.log("[groupSlotsByDate] Créneaux groupés par date:", grouped);
+    return grouped;
+  }, [generatedSlots]);
+
+  // CORRECTION: Utiliser useMemo pour optimiser le calcul et éviter les rendus inutiles
+  const groupedSlots = useMemo(() => groupSlotsByDate(), [groupSlotsByDate]);
 
   const handleLoginPress = () => {
     navigation.navigate('Auth', { screen: 'Login' });
   };
 
-  const handleConfirmBooking = () => {
-    if (!selectedDate || !selectedTime || !doctor) return;
+  // CORRECTION: Corriger la sélection de date pour récupérer l'objet groupé
+  const handleDateSelect = (date) => {
+    console.log("[handleDateSelect] Date sélectionnée:", date);
+    const selectedGroup = groupedSlots.find(g => g.date === date.date);
+    setSelectedDate(selectedGroup || date);
+    setSelectedTime(null); // Réinitialiser l'heure sélectionnée
+  };
+
+  const handleTimeSelect = (slot) => {
+    console.log("[handleTimeSelect] Créneau sélectionné:", slot);
+    setSelectedTime(slot);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!selectedDate || !selectedTime || !selectedDoctor) {
+      console.error("[handleConfirmBooking] Sélection incomplète:", { selectedDate, selectedTime, hasDoctor: !!selectedDoctor });
+      return;
+    }
     
     if (!token) {
+      console.log("[handleConfirmBooking] Utilisateur non connecté, affichage de l'alerte.");
       Alert.alert(
         'Connexion requise',
         'Vous devez vous connecter pour confirmer votre rendez-vous.',
@@ -94,78 +228,115 @@ export default function BookingScreen({ navigation, route }) {
       return;
     }
     
-    // Simulation de la prise de rendez-vous
-    Alert.alert(
-      'Rendez-vous confirmé !',
-      `Votre rendez-vous avec ${doctor?.title || 'Dr'} ${doctor?.lastName || 'Nom non disponible'} est confirmé pour le ${selectedDate} à ${selectedTime}.`,
-      [
-        { 
-          text: 'OK', 
-          onPress: () => {
-            // Ici on sauvegarderait le rendez-vous
-            navigation.goBack();
+    try {
+      setBookingError(null);
+      
+      // CORRECTION: Utiliser selectedDate.date pour avoir la chaîne de caractères de la date
+      const appointmentData = {
+        doctorId: selectedDoctor.doctor?.id || doctorId,
+        startsAt: new Date(`${selectedDate.date}T${selectedTime.time}:00`).toISOString(),
+        endsAt: new Date(`${selectedDate.date}T${selectedTime.time}:00`).toISOString(), // À ajuster selon la durée du rdv
+        status: 'PENDING'
+      };
+      
+      console.log("[handleConfirmBooking] Données du rendez-vous à envoyer:", JSON.stringify(appointmentData, null, 2));
+      
+      const appointment = await bookAppointment(appointmentData);
+      
+      console.log("[handleConfirmBooking] Réponse de l'API après réservation:", appointment);
+      
+      Alert.alert(
+        'Rendez-vous confirmé !',
+        `Votre rendez-vous avec le Dr ${selectedDoctor.lastName || ''} est confirmé pour le ${selectedDate.dayName} ${selectedDate.dayNumber} ${selectedDate.month} à ${selectedTime.time}.`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              navigation.navigate('AppointmentDetails', { appointmentId: appointment.id });
+            }
           }
-        }
-      ]
+        ]
+      );
+    } catch (error) {
+      console.error("[handleConfirmBooking] Erreur lors de la réservation:", error);
+      setBookingError(error.message || "Une erreur est survenue lors de la réservation");
+    }
+  };
+
+  // CORRECTION: Ajouter des vérifications dans les fonctions de rendu pour éviter les erreurs
+  const renderDateItem = ({ item }) => {
+    if (!item || !item.date) return null;
+    
+    return (
+      <Pressable
+        key={item.date}
+        onPress={() => handleDateSelect(item)}
+        style={[
+          s.dateItem,
+          selectedDate?.date === item.date && s.dateItemSelected,
+        ]}
+      >
+        <Text style={[s.dateDay, selectedDate?.date === item.date && s.dateDaySelected]}>
+          {item.dayName}
+        </Text>
+        <Text style={[s.dateNumber, selectedDate?.date === item.date && s.dateNumberSelected]}>
+          {item.dayNumber}
+        </Text>
+        <Text style={[s.dateMonth, selectedDate?.date === item.date && s.dateMonthSelected]}>
+          {item.month}
+        </Text>
+      </Pressable>
     );
   };
 
-  const renderDateItem = (dateInfo) => (
-    <Pressable
-      key={dateInfo.dayNumber}
-      onPress={() => dateInfo.available && setSelectedDate(dateInfo)}
-      style={[
-        s.dateItem,
-        selectedDate?.dayNumber === dateInfo.dayNumber && s.dateItemSelected,
-        !dateInfo.available && s.dateItemDisabled,
-      ]}
-    >
-      <Text style={[
-        s.dateDay,
-        selectedDate?.dayNumber === dateInfo.dayNumber && s.dateDaySelected,
-        !dateInfo.available && s.dateDayDisabled,
-      ]}>
-        {dateInfo.day}
-      </Text>
-      <Text style={[
-        s.dateNumber,
-        selectedDate?.dayNumber === dateInfo.dayNumber && s.dateNumberSelected,
-        !dateInfo.available && s.dateNumberDisabled,
-      ]}>
-        {dateInfo.dayNumber}
-      </Text>
-      <Text style={[
-        s.dateMonth,
-        selectedDate?.dayNumber === dateInfo.dayNumber && s.dateMonthSelected,
-        !dateInfo.available && s.dateMonthDisabled,
-      ]}>
-        {dateInfo.month}
-      </Text>
-    </Pressable>
-  );
+  // CORRECTION: Ajouter des vérifications supplémentaires dans renderTimeSlot
+  const renderTimeSlot = ({ item }) => {
+    if (!item || !item.id || !item.time) return null;
+    
+    return (
+      <Pressable
+        key={item.id}
+        onPress={() => handleTimeSelect(item)}
+        style={[
+          s.timeSlot,
+          selectedTime?.id === item.id && s.timeSlotSelected,
+        ]}
+      >
+        <Text style={[s.timeText, selectedTime?.id === item.id && s.timeTextSelected]}>
+          {item.time}
+        </Text>
+      </Pressable>
+    );
+  };
 
-  const renderTimeSlot = (slot) => (
-    <Pressable
-      key={slot.time}
-      onPress={() => slot.available && setSelectedTime(slot)}
-      style={[
-        s.timeSlot,
-        selectedTime?.time === slot.time && s.timeSlotSelected,
-        !slot.available && s.timeSlotDisabled,
-      ]}
-    >
-      <Text style={[
-        s.timeText,
-        selectedTime?.time === slot.time && s.timeTextSelected,
-        !slot.available && s.timeTextDisabled,
-      ]}>
-        {slot.time}
-      </Text>
-    </Pressable>
-  );
+  // Affichage pendant le chargement
+  if (doctorLoading) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={s.loadingContainer}>
+          <Text style={s.loadingText}>Chargement des détails du médecin...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Affichage en cas d'erreur
+  if (doctorError) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={s.errorContainer}>
+          <Text style={s.errorText}>Erreur: {doctorError}</Text>
+          <Button title="Réessayer" onPress={() => getDoctorDetails(doctorId)} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // CORRECTION: Assurez-vous que l'URL de l'API est définie
+  const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://votre-api.com';
 
   return (
-    <View style={s.container}>
+    <SafeAreaView style={s.container}>
       {/* Header avec navigation */}
       <View style={s.header}>
         <View style={s.headerTop}>
@@ -190,18 +361,34 @@ export default function BookingScreen({ navigation, route }) {
           }
         ]}>
           {/* Doctor Summary */}
-          {doctor && (
+          {selectedDoctor && (
             <View style={s.doctorCard}>
               <View style={s.doctorSummary}>
                 <View style={s.doctorAvatar}>
-                  <Ionicons name="medical" size={32} color={colors.primary} />
+                  {selectedDoctor.doctor?.profileFilename ? (
+                    <Image 
+                      source={{ uri: `${API_URL}/uploads/${selectedDoctor.doctor.profileFilename}` }} 
+                      style={s.doctorAvatarImage} 
+                    />
+                  ) : (
+                    <Ionicons name="medical" size={32} color={colors.primary} />
+                  )}
                 </View>
                 <View style={s.doctorInfo}>
-                  <Text style={s.doctorName}>{doctor.title} {doctor.lastName}</Text>
-                  <Text style={s.doctorSpecialty}>{doctor.specialty}</Text>
+                  <Text style={s.doctorName}>
+                    {selectedDoctor.firstName} {selectedDoctor.lastName}
+                  </Text>
+                  <Text style={s.doctorSpecialty}>
+                    {selectedDoctor.doctor?.specializations?.map(spec => spec.skill?.name).join(', ') || 'Médecin'}
+                  </Text>
                   <View style={s.doctorLocation}>
                     <Ionicons name="location" size={16} color={colors.textSecondary} />
-                    <Text style={s.doctorAddress}>{doctor.district}, {doctor.city}</Text>
+                    <Text style={s.doctorAddress}>
+                      {selectedDoctor.doctor?.map_pin ? 
+                        JSON.parse(selectedDoctor.doctor.map_pin).address || 'Adresse non spécifiée'
+                        : 'Adresse non spécifiée'
+                      }
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -216,11 +403,22 @@ export default function BookingScreen({ navigation, route }) {
               </View>
               <Text style={s.sectionTitle}>Choisir une date</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.datesContainer}>
-              <View style={s.datesList}>
-                {availableDates.map(renderDateItem)}
+            {/* CORRECTION: Améliorer le rendu conditionnel pour éviter les appels vides */}
+            {groupedSlots.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.datesContainer}>
+                <View style={s.datesList}>
+                  {groupedSlots.map(renderDateItem)}
+                </View>
+              </ScrollView>
+            ) : (
+              <View style={s.emptyContainer}>
+                <Ionicons name="calendar-outline" size={48} color={colors.textTertiary} />
+                <Text style={s.emptyTitle}>Aucun créneau disponible</Text>
+                <Text style={s.emptySubtitle}>
+                  Ce médecin n'a pas d'heures d'ouverture configurées
+                </Text>
               </View>
-            </ScrollView>
+            )}
           </View>
 
           {/* Time Selection */}
@@ -233,13 +431,14 @@ export default function BookingScreen({ navigation, route }) {
                 <Text style={s.sectionTitle}>Choisir un créneau</Text>
               </View>
               <View style={s.timeSlotsContainer}>
-                {timeSlots.map(renderTimeSlot)}
+                {/* CORRECTION: Vérifier que selectedDate.slots existe bien avant de mapper */}
+                {selectedDate.slots && selectedDate.slots.map(renderTimeSlot)}
               </View>
             </View>
           )}
 
           {/* Booking Summary */}
-          {selectedDate && selectedTime && doctor && (
+          {selectedDate && selectedTime && selectedDoctor && (
             <View style={s.summaryCard}>
               <View style={s.sectionHeader}>
                 <View style={s.sectionIcon}>
@@ -250,12 +449,14 @@ export default function BookingScreen({ navigation, route }) {
               <View style={s.summaryContent}>
                 <View style={s.summaryItem}>
                   <Text style={s.summaryLabel}>Médecin</Text>
-                  <Text style={s.summaryValue}>{doctor.title} {doctor.lastName}</Text>
+                  <Text style={s.summaryValue}>
+                    Dr {selectedDoctor.firstName} {selectedDoctor.lastName}
+                  </Text>
                 </View>
                 <View style={s.summaryItem}>
                   <Text style={s.summaryLabel}>Date</Text>
                   <Text style={s.summaryValue}>
-                    {selectedDate.day} {selectedDate.dayNumber} {selectedDate.month}
+                    {selectedDate.dayName} {selectedDate.dayNumber} {selectedDate.month}
                   </Text>
                 </View>
                 <View style={s.summaryItem}>
@@ -263,6 +464,13 @@ export default function BookingScreen({ navigation, route }) {
                   <Text style={s.summaryValue}>{selectedTime.time}</Text>
                 </View>
               </View>
+            </View>
+          )}
+
+          {/* Error Message */}
+          {bookingError && (
+            <View style={s.errorCard}>
+              <Text style={s.errorText}>{bookingError}</Text>
             </View>
           )}
 
@@ -284,7 +492,7 @@ export default function BookingScreen({ navigation, route }) {
           )}
 
           {/* Confirm Button */}
-          {selectedDate && selectedTime && doctor && (
+          {selectedDate && selectedTime && selectedDoctor && (
             <View style={s.confirmButtonContainer}>
               <Button
                 title={token ? "Confirmer le rendez-vous" : "Se connecter pour confirmer"}
@@ -296,14 +504,36 @@ export default function BookingScreen({ navigation, route }) {
           )}
         </Animated.View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
+// Stylesheet complet
 const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...textStyles.body,
+    color: colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  errorText: {
+    ...textStyles.body,
+    color: colors.error,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   header: {
     backgroundColor: colors.primaryDeep,
@@ -364,6 +594,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
+    overflow: 'hidden',
+  },
+  doctorAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   doctorInfo: {
     flex: 1,
@@ -416,6 +651,35 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
+  errorCard: {
+    backgroundColor: colors.errorMuted,
+    borderRadius: 16,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.errorMuted,
+    padding: spacing.md,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTitle: {
+    ...textStyles.h3,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  emptySubtitle: {
+    ...textStyles.body,
+    fontSize: 15,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,15 +716,14 @@ const s = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: 12,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.background,
     minWidth: 70,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   dateItemSelected: {
     backgroundColor: colors.primary,
-  },
-  dateItemDisabled: {
-    backgroundColor: colors.backgroundSecondary,
-    opacity: 0.5,
+    borderColor: colors.primary,
   },
   dateDay: {
     ...textStyles.caption,
@@ -472,9 +735,6 @@ const s = StyleSheet.create({
   dateDaySelected: {
     color: 'white',
   },
-  dateDayDisabled: {
-    color: colors.textTertiary,
-  },
   dateNumber: {
     ...textStyles.h3,
     fontSize: 18,
@@ -485,9 +745,6 @@ const s = StyleSheet.create({
   dateNumberSelected: {
     color: 'white',
   },
-  dateNumberDisabled: {
-    color: colors.textTertiary,
-  },
   dateMonth: {
     ...textStyles.caption,
     fontSize: 12,
@@ -496,9 +753,6 @@ const s = StyleSheet.create({
   },
   dateMonthSelected: {
     color: 'white',
-  },
-  dateMonthDisabled: {
-    color: colors.textTertiary,
   },
   timeSlotsContainer: {
     flexDirection: 'row',
@@ -511,16 +765,15 @@ const s = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 8,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.background,
     minWidth: 80,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   timeSlotSelected: {
     backgroundColor: colors.primary,
-  },
-  timeSlotDisabled: {
-    backgroundColor: colors.backgroundSecondary,
-    opacity: 0.5,
+    borderColor: colors.primary,
   },
   timeText: {
     ...textStyles.body,
@@ -530,9 +783,6 @@ const s = StyleSheet.create({
   },
   timeTextSelected: {
     color: 'white',
-  },
-  timeTextDisabled: {
-    color: colors.textTertiary,
   },
   summaryContent: {
     paddingHorizontal: spacing.lg,

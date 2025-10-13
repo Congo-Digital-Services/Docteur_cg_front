@@ -55,10 +55,31 @@ export async function getDoctor(id) {
     if (!id) {
       throw new Error("L'ID du médecin est requis.");
     }
+    
+    // console.log("Récupération des détails du médecin avec l'ID:", id);
     const res = await api.get(`/user/doctor/one?id=${id}`);
+    
+    // Vérifier si la réponse contient des données
+    if (!res.data) {
+      console.error("La réponse de l'API ne contient pas de données:", res);
+      throw new Error("Aucune donnée reçue de l'API");
+    }
+    
+    // console.log("Détails du médecin récupérés:", res.data);
     return res.data;
   } catch (error) {
     console.error(`Erreur lors de la récupération du médecin ${id}:`, error);
+    
+    // Afficher plus de détails sur l'erreur
+    if (error.response) {
+      console.error("Détails de l'erreur de réponse:", {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    }
+    
     throw error;
   }
 }

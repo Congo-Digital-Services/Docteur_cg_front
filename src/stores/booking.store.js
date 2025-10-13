@@ -4,249 +4,166 @@ import {
   getMyAppointments, 
   cancelAppointment, 
   updateAppointment,
-  getAppointment,
-  getDoctorSlots
+  getAppointment
 } from '../services/appointments';
+import { getDoctorOpeningHours, generateWeeklySlots } from '../services/slots';
 
 const useBookingStore = create((set, get) => ({
-  // État pour la sélection
+  // État pour la réservation
   selectedDoctor: null,
-  selectedDate: null,
-  selectedSlot: null,
-  
-  // État pour les créneaux
   slots: [],
-  slotsLoading: false,
-  slotsError: null,
-  
-  // État pour les rendez-vous
+  selectedSlot: null,
   appointments: [],
-  appointmentsLoading: false,
-  appointmentsError: null,
-  currentAppointment: null,
-  currentAppointmentLoading: false,
-  currentAppointmentError: null,
-  
-  // État pour la pagination
-  currentPage: 1,
-  totalPages: 1,
-  total: 0,
-  hasMore: true,
-  
+  appointmentDetails: null,
+  loading: false,
+  error: null,
+
   // Actions pour les créneaux
-  loadSlots: async (doctorId, date) => {
-    set({ slotsLoading: true, slotsError: null });
-    
+  loadSlots: async (doctorId) => {
+    set({ loading: true, error: null });
     try {
-      const data = await getDoctorSlots(doctorId, date);
-      set({ 
-        slots: data || [], 
-        slotsLoading: false 
-      });
+      const openingHours = await getDoctorOpeningHours(doctorId);
+      const slots = generateWeeklySlots(openingHours);
+      set({ slots, loading: false });
     } catch (error) {
-      let errorMessage = "Une erreur est survenue lors du chargement des créneaux.";
-      
-      if (error.response) {
-        if (error.response.status >= 500) {
-          errorMessage = "Le service est temporairement indisponible.";
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      } else if (error.request) {
-        errorMessage = "Problème de connexion. Vérifiez votre réseau.";
-      } else {
-        errorMessage = error.message;
-      }
-      
-      set({ slotsError: errorMessage, slotsLoading: false });
+      set({ 
+        error: error.message || "Erreur lors du chargement des créneaux", 
+        loading: false 
+      });
+      throw error;
     }
   },
-  
-  // Actions pour la sélection
+
   selectDoctor: (doctor) => set({ selectedDoctor: doctor }),
-  selectDate: (date) => set({ selectedDate: date }),
   selectSlot: (slot) => set({ selectedSlot: slot }),
-  clearSelection: () => set({ 
-    selectedDoctor: null, 
-    selectedDate: null, 
-    selectedSlot: null 
-  }),
-  
+  clearSelection: () => set({ selectedDoctor: null, selectedSlot: null }),
+
   // Actions pour les rendez-vous
   bookAppointment: async () => {
-    const { selectedDoctor, selectedDate, selectedSlot } = get();
-    
-    if (!selectedDoctor || !selectedDate || !selectedSlot) {
+    const { selectedDoctor, selectedSlot } = get();
+    if (!selectedDoctor || !selectedSlot) {
       throw new Error('Sélection incomplète');
     }
     
     try {
-      const appointment = await createAppointment({
+      set({ loading: true, error: null });
+      
+      // Créer l'objet de rendez-vous
+      const appointmentData = {
         doctorId: selectedDoctor.id,
-        startsAt: selectedSlot.startsAt,
-        endsAt: selectedSlot.endsAt,
-        notes: ''
-      });
+        startsAt: new Date(`${selectedSlot.date}T${selectedSlot.time}:00`).toISOString(),
+        endsAt: new Date(`${selectedSlot.date}T${selectedSlot.time}:00`).toISOString(), // À ajuster selon la durée du rendez-vous
+        status: 'PENDING'
+      };
       
-      // Rafraîchir la liste des rendez-vous après la création
-      get().loadMyAppointments();
+      const appointment = await createAppointment(appointmentData);
       
+      // Rafraîchir la liste des rendez-vous
+      await get().loadMyAppointments();
+      
+      set({ loading: false });
       return appointment;
     } catch (error) {
-      console.error("Erreur lors de la réservation:", error);
+      set({ 
+        error: error.message || "Erreur lors de la réservation", 
+        loading: false 
+      });
       throw error;
     }
   },
-  
-  loadMyAppointments: async (resetPage = true) => {
-    set({ appointmentsLoading: true, appointmentsError: null });
-    
-    if (resetPage) {
-      set({ currentPage: 1, appointments: [] });
-    }
-    
+
+  loadMyAppointments: async (params = {}) => {
+    set({ loading: true, error: null });
     try {
-      const page = resetPage ? 1 : get().currentPage;
-      const response = await getMyAppointments({ page });
+      const response = await getMyAppointments(params);
       
       // Le backend retourne un objet paginé
-      const items = response.items || [];
-      const total = response.total || 0;
-      const pageSize = response.pageSize || 10;
-      const totalPages = Math.ceil(total / pageSize);
-      const hasNext = page < totalPages;
+      const appointments = response.items || [];
       
-      set((state) => ({
-        appointments: resetPage ? items : [...state.appointments, ...items],
-        total,
-        totalPages,
-        hasMore: hasNext,
-        currentPage: page + 1,
-        appointmentsLoading: false,
-      }));
+      set({ 
+        appointments, 
+        loading: false 
+      });
+      return response;
     } catch (error) {
-      let errorMessage = "Une erreur est survenue lors du chargement des rendez-vous.";
-      
-      if (error.response) {
-        if (error.response.status >= 500) {
-          errorMessage = "Le service est temporairement indisponible.";
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      } else if (error.request) {
-        errorMessage = "Problème de connexion. Vérifiez votre réseau.";
-      } else {
-        errorMessage = error.message;
-      }
-      
-      set({ appointmentsError: errorMessage, appointmentsLoading: false });
+      set({ 
+        error: error.message || "Erreur lors du chargement des rendez-vous", 
+        loading: false 
+      });
+      throw error;
     }
   },
-  
-  loadMoreAppointments: async () => {
-    const { hasMore, appointmentsLoading } = get();
-    if (!hasMore || appointmentsLoading) return;
-    
-    // Ne pas réinitialiser les résultats ni la page
-    get().loadMyAppointments(false);
-  },
-  
-  getAppointmentDetails: async (id) => {
-    set({ currentAppointmentLoading: true, currentAppointmentError: null });
-    
+
+  loadAppointmentDetails: async (id) => {
+    set({ loading: true, error: null });
     try {
       const appointment = await getAppointment(id);
       set({ 
-        currentAppointment: appointment, 
-        currentAppointmentLoading: false 
+        appointmentDetails: appointment, 
+        loading: false 
       });
       return appointment;
     } catch (error) {
-      let errorMessage = "Une erreur est survenue lors du chargement du rendez-vous.";
-      
-      if (error.response) {
-        if (error.response.status >= 500) {
-          errorMessage = "Le service est temporairement indisponible.";
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      } else if (error.request) {
-        errorMessage = "Problème de connexion. Vérifiez votre réseau.";
-      } else {
-        errorMessage = error.message;
-      }
-      
-      set({ currentAppointmentError: errorMessage, currentAppointmentLoading: false });
+      set({ 
+        error: error.message || "Erreur lors du chargement des détails du rendez-vous", 
+        loading: false 
+      });
       throw error;
     }
   },
-  
-  updateAppointment: async (id, updates) => {
+
+  updateAppointment: async (appointmentData) => {
+    set({ loading: true, error: null });
     try {
-      const appointment = await updateAppointment({ id, ...updates });
+      const updatedAppointment = await updateAppointment(appointmentData);
       
       // Mettre à jour le rendez-vous dans la liste
-      set((state) => ({
-        appointments: state.appointments.map((apt) => 
-          apt.id === id ? { ...apt, ...updates } : apt
+      set(state => ({
+        appointments: state.appointments.map(apt => 
+          apt.id === updatedAppointment.id ? updatedAppointment : apt
         ),
-        currentAppointment: state.currentAppointment?.id === id 
-          ? { ...state.currentAppointment, ...updates } 
-          : state.currentAppointment
+        appointmentDetails: state.appointmentDetails?.id === updatedAppointment.id 
+          ? updatedAppointment 
+          : state.appointmentDetails,
+        loading: false
       }));
       
-      return appointment;
+      return updatedAppointment;
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du rendez-vous:", error);
+      set({ 
+        error: error.message || "Erreur lors de la mise à jour du rendez-vous", 
+        loading: false 
+      });
       throw error;
     }
   },
-  
+
   cancelAppointment: async (id) => {
+    set({ loading: true, error: null });
     try {
       await cancelAppointment(id);
       
       // Mettre à jour le statut du rendez-vous dans la liste
-      set((state) => ({
-        appointments: state.appointments.map((apt) => 
+      set(state => ({
+        appointments: state.appointments.map(apt => 
           apt.id === id ? { ...apt, status: 'CANCELED' } : apt
         ),
-        currentAppointment: state.currentAppointment?.id === id 
-          ? { ...state.currentAppointment, status: 'CANCELED' } 
-          : state.currentAppointment
+        appointmentDetails: state.appointmentDetails?.id === id 
+          ? { ...state.appointmentDetails, status: 'CANCELED' } 
+          : state.appointmentDetails,
+        loading: false
       }));
     } catch (error) {
-      console.error("Erreur lors de l'annulation du rendez-vous:", error);
+      set({ 
+        error: error.message || "Erreur lors de l'annulation du rendez-vous", 
+        loading: false 
+      });
       throw error;
     }
   },
-  
-  // Réinitialiser les erreurs
-  clearErrors: () => set({ 
-    slotsError: null, 
-    appointmentsError: null, 
-    currentAppointmentError: null 
-  }),
-  
-  // Réinitialiser complètement l'état
-  reset: () => set({
-    selectedDoctor: null,
-    selectedDate: null,
-    selectedSlot: null,
-    slots: [],
-    slotsLoading: false,
-    slotsError: null,
-    appointments: [],
-    appointmentsLoading: false,
-    appointmentsError: null,
-    currentAppointment: null,
-    currentAppointmentLoading: false,
-    currentAppointmentError: null,
-    currentPage: 1,
-    totalPages: 1,
-    total: 0,
-    hasMore: true,
-  }),
+
+  clearError: () => set({ error: null }),
+  clearAppointmentDetails: () => set({ appointmentDetails: null }),
 }));
 
 export default useBookingStore;
