@@ -7,7 +7,8 @@ import {
   confirmAccount as apiConfirmAccount,
   requestPasswordReset as apiRequestPasswordReset,
   confirmPasswordReset as apiConfirmPasswordReset,
-  resendVerificationCode as apiResendVerificationCode
+  resendVerificationCode as apiResendVerificationCode,
+  guestAuth as apiGuestAuth
 } from '@/services/auth';
 
 const useAuthStore = create((set, get) => ({
@@ -16,21 +17,38 @@ const useAuthStore = create((set, get) => ({
   loading: false,
   confirmationToken: null,
   passwordResetToken: null,
+  isGuest: false,
+  // NOUVEL ÉTAT pour suivre l'initialisation
+  isInitialized: false,
 
   init: async () => {
-    const token = await AsyncStorage.getItem('auth_token');
-    if (token) {
-      set({ token });
-      try {
-        const { client } = await apiMe(); // me() renvoie { client, access_token }
+    console.log("AuthStore: Initializing...");
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      const isGuest = await AsyncStorage.getItem('is_guest') === 'true';
+      
+      if (token) {
+        set({ token, isGuest });
+        // On tente de vérifier le token auprès du backend
+        const { client } = await apiMe();
         set({ user: client });
-      } catch {
-        set({ token: null, user: null });
-        await AsyncStorage.removeItem('auth_token');
+        console.log("AuthStore: Initialized with user.", client.email);
+      } else {
+        console.log("AuthStore: No token found, user is logged out.");
       }
+    } catch (error) {
+      console.error("AuthStore: Failed to initialize auth.", error);
+      // En cas d'erreur (token invalide, réseau...), on nettoie tout
+      set({ token: null, user: null, isGuest: false });
+      await AsyncStorage.multiRemove(['auth_token', 'is_guest']);
+    } finally {
+      // TRÈS IMPORTANT : on marque l'initialisation comme terminée dans tous les cas
+      set({ isInitialized: true });
+      console.log("AuthStore: Initialization finished.");
     }
   },
 
+  // ... (le reste de vos fonctions login, register, etc. reste inchangé)
   // credentials = { email, password, phone? }
   login: async (credentials) => {
     set({ loading: true });
@@ -38,8 +56,11 @@ const useAuthStore = create((set, get) => ({
       const { client, access_token } = await apiLogin(credentials);
       if (!access_token) throw new Error("Token manquant à la connexion");
 
-      await AsyncStorage.setItem('auth_token', access_token);
-      set({ token: access_token, user: client, loading: false });
+      await AsyncStorage.multiSet([
+        ['auth_token', access_token],
+        ['is_guest', 'false']
+      ]);
+      set({ token: access_token, user: client, loading: false, isGuest: false });
       return true;
     } catch (e) {
       set({ loading: false });
@@ -54,7 +75,6 @@ const useAuthStore = create((set, get) => ({
       const { confim_token } = await apiRegister(data);
       if (!confim_token) throw new Error("Échec de la création du compte");
       
-      // Stocke le token de confirmation temporairement
       await AsyncStorage.setItem('confirm_token', confim_token);
       set({ confirmationToken: confim_token, loading: false });
       
@@ -65,26 +85,26 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Vérification du compte avec OTP
   confirmAccount: async (code) => {
     set({ loading: true });
     try {
-      const confirmationToken = get().confirmationToken || 
-        await AsyncStorage.getItem('confirm_token');
-      
+      const confirmationToken = get().confirmationToken || await AsyncStorage.getItem('confirm_token');
       if (!confirmationToken) throw new Error("Token de confirmation manquant");
       
       const { user, access_token } = await apiConfirmAccount(code, confirmationToken);
       
-      // Stocke le token permanent
-      await AsyncStorage.setItem('auth_token', access_token);
+      await AsyncStorage.multiSet([
+        ['auth_token', access_token],
+        ['is_guest', 'false']
+      ]);
       await AsyncStorage.removeItem('confirm_token');
       
       set({ 
         token: access_token, 
         user, 
         confirmationToken: null, 
-        loading: false 
+        loading: false,
+        isGuest: false
       });
       
       return true;
@@ -94,14 +114,12 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Demande de réinitialisation de mot de passe
   requestPasswordReset: async ({ email, phone }) => {
     set({ loading: true });
     try {
       const { confim_token } = await apiRequestPasswordReset({ email, phone });
       if (!confim_token) throw new Error("Échec de la demande de réinitialisation");
       
-      // Stocke le token de réinitialisation
       await AsyncStorage.setItem('reset_token', confim_token);
       set({ passwordResetToken: confim_token, loading: false });
       
@@ -112,26 +130,26 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Confirmation de réinitialisation de mot de passe
   confirmPasswordReset: async (code, newPassword) => {
     set({ loading: true });
     try {
-      const resetToken = get().passwordResetToken || 
-        await AsyncStorage.getItem('reset_token');
-      
+      const resetToken = get().passwordResetToken || await AsyncStorage.getItem('reset_token');
       if (!resetToken) throw new Error("Token de réinitialisation manquant");
       
       const { user, access_token } = await apiConfirmPasswordReset(code, newPassword, resetToken);
       
-      // Stocke le nouveau token
-      await AsyncStorage.setItem('auth_token', access_token);
+      await AsyncStorage.multiSet([
+        ['auth_token', access_token],
+        ['is_guest', 'false']
+      ]);
       await AsyncStorage.removeItem('reset_token');
       
       set({ 
         token: access_token, 
         user, 
         passwordResetToken: null, 
-        loading: false 
+        loading: false,
+        isGuest: false
       });
       
       return true;
@@ -141,18 +159,14 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Renvoi du code de vérification
   resendVerificationCode: async () => {
     set({ loading: true });
     try {
-      const confirmationToken = get().confirmationToken || 
-        await AsyncStorage.getItem('confirm_token');
-      
+      const confirmationToken = get().confirmationToken || await AsyncStorage.getItem('confirm_token');
       if (!confirmationToken) throw new Error("Token de confirmation manquant");
       
       const { confim_token } = await apiResendVerificationCode(confirmationToken);
       
-      // Met à jour le token si nécessaire
       if (confim_token !== confirmationToken) {
         await AsyncStorage.setItem('confirm_token', confim_token);
         set({ confirmationToken: confim_token });
@@ -166,18 +180,44 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  guestAuth: async () => {
+    set({ loading: true });
+    try {
+      const { access_token } = await apiGuestAuth();
+      if (!access_token) throw new Error("Échec de l'authentification invité");
+      
+      await AsyncStorage.multiSet([
+        ['auth_token', access_token],
+        ['is_guest', 'true']
+      ]);
+      
+      set({ 
+        token: access_token, 
+        user: null, 
+        loading: false,
+        isGuest: true
+      });
+      
+      return true;
+    } catch (e) {
+      set({ loading: false });
+      throw e;
+    }
+  },
+
   logout: async () => {
-    await AsyncStorage.multiRemove(['auth_token', 'confirm_token', 'reset_token']);
+    await AsyncStorage.multiRemove(['auth_token', 'confirm_token', 'reset_token', 'is_guest']);
     set({ 
       token: null, 
       user: null, 
       confirmationToken: null, 
-      passwordResetToken: null 
+      passwordResetToken: null,
+      isGuest: false
     });
   },
 }));
 
-// auto-init
-useAuthStore.getState().init?.();
+// L'initialisation est toujours lancée ici, au démarrage de l'app
+useAuthStore.getState().init();
 
 export default useAuthStore;

@@ -1,46 +1,87 @@
-import { delay } from '../utils/delay';
-import baseAppointments from '../mocks/appointments.json';
-import baseDoctors from '../mocks/doctors.json';
-import baseSlots from '../mocks/slots.json';
+import api from './apiClient';
 
-let appts = [...baseAppointments]; // in-memory
-
-export async function getMyAppointments() {
-  await delay(400);
-  
-  // Enrichir les rendez-vous avec les données du médecin et du créneau
-  return appts.map(appointment => {
-    const doctor = baseDoctors.find(d => d.id === appointment.doctorId);
-    const slot = baseSlots.find(s => s.id === appointment.slotId);
+/**
+ * Récupère tous les rendez-vous du patient connecté
+ * Correspond à l'endpoint GET /user/patient/appointment
+ */
+export async function getMyAppointments(params = {}) {
+  try {
+    const queryParams = new URLSearchParams();
     
-    return {
-      ...appointment,
-      doctor,
-      date: slot?.date || '2024-01-15',
-      time: slot?.time || '10:00'
-    };
-  });
-}
-
-export async function createAppointment({ doctorId, slotId }) {
-  await delay(600);
-  // simulate taken slot
-  if (Math.random() < 0.18) {
-    const err = new Error('Créneau déjà pris. Essayez un autre créneau.');
-    err.code = 'SLOT_TAKEN';
-    throw err;
+    // Ajout des paramètres de pagination
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+    if (params.order) queryParams.append('order', params.order);
+    
+    const res = await api.get(`/user/patient/appointment?${queryParams.toString()}`);
+    return res.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des rendez-vous:", error);
+    throw error;
   }
-  const newAppt = {
-    id: 'a_' + Math.random().toString(36).slice(2),
-    doctorId,
-    slotId,
-    status: 'PENDING'
-  };
-  appts.unshift(newAppt);
-  return newAppt;
 }
 
+/**
+ * Récupère les détails d'un rendez-vous spécifique
+ * Correspond à l'endpoint GET /user/patient/appointment/:id
+ */
+export async function getAppointmentDetails(id) {
+  try {
+    const res = await api.get(`/user/patient/appointment/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error(`Erreur lors de la récupération du rendez-vous ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Crée un nouveau rendez-vous
+ * Correspond à l'endpoint POST /user/patient/appointment
+ */
+export async function createAppointment(appointmentData) {
+  try {
+    const res = await api.post('/user/patient/appointment', appointmentData);
+    return res.data;
+  } catch (error) {
+    console.error("Erreur lors de la création du rendez-vous:", error);
+    
+    // Gestion des erreurs spécifiques
+    if (error.response?.status === 400) {
+      const errorMessage = error.response.data?.message || 'Données invalides';
+      throw new Error(errorMessage);
+    } else if (error.response?.status === 409) {
+      throw new Error('Ce créneau est déjà réservé. Veuillez choisir un autre créneau.');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Met à jour un rendez-vous existant
+ * Correspond à l'endpoint PATCH /user/patient/appointment
+ */
+export async function updateAppointment(appointmentData) {
+  try {
+    const res = await api.patch('/user/patient/appointment', appointmentData);
+    return res.data;
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du rendez-vous:", error);
+    throw error;
+  }
+}
+
+/**
+ * Annule un rendez-vous
+ * Correspond à l'endpoint DELETE /user/patient/appointment/:id
+ */
 export async function cancelAppointment(id) {
-  await delay(300);
-  appts = appts.map((a) => (a.id === id ? { ...a, status: 'DECLINED' } : a));
+  try {
+    const res = await api.delete(`/user/patient/appointment/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error(`Erreur lors de l'annulation du rendez-vous ${id}:`, error);
+    throw error;
+  }
 }

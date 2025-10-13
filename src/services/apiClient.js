@@ -1,21 +1,9 @@
+// services/api.js
 import axios from 'axios';
 import { getAuthToken } from '@/utils/authToken';
 
-const mode = process.env.APP_MODE || 'mock';
-
-let baseURL;
-switch (mode) {
-  case 'real':
-    baseURL = process.env.API_URL;
-    break;
-  case 'dev':
-    baseURL = process.env.API_URL_DEV;
-    break;
-  case 'mock':
-  default:
-    baseURL = process.env.API_URL_MOCK;
-    break;
-}
+// Utilisation directe de l'URL de l'API sans mode mock
+const baseURL = process.env.API_URL || 'https://votre-api-url.com';
 
 const api = axios.create({
   baseURL,
