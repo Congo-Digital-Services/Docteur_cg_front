@@ -30,13 +30,32 @@ export default function AppointmentsScreen({ navigation }) {
 
   useEffect(() => {
     console.log('[AppointmentsScreen] useEffect - Token:', token ? 'Présent' : 'Absent');
+    console.log('[AppointmentsScreen] useEffect - User ID:', user?.id || 'Non défini');
+    
     if (token) {
       console.log('[AppointmentsScreen] Chargement des rendez-vous...');
       loadMine().then(response => {
-        console.log('[AppointmentsScreen] Rendez-vous chargés:', response);
-        console.log('[AppointmentsScreen] Nombre de rendez-vous:', appointments.length);
+        console.log('[AppointmentsScreen] Rendez-vous chargés avec succès');
+        console.log('[AppointmentsScreen] Nombre total de rendez-vous:', appointments.length);
+        
+        // Log détaillé des rendez-vous
+        if (appointments.length > 0) {
+          console.log('[AppointmentsScreen] Détail des rendez-vous:');
+          appointments.forEach((appointment, index) => {
+            console.log(`[AppointmentsScreen] Rendez-vous ${index + 1}:`, {
+              id: appointment.id,
+              doctor: `${appointment.doctor?.title || ''} ${appointment.doctor?.lastName || ''}`,
+              date: appointment.date,
+              time: appointment.time,
+              status: appointment.status
+            });
+          });
+        } else {
+          console.log('[AppointmentsScreen] Aucun rendez-vous trouvé');
+        }
       }).catch(error => {
         console.error('[AppointmentsScreen] Erreur lors du chargement des rendez-vous:', error);
+        console.error('[AppointmentsScreen] Détail de l\'erreur:', error.message || 'Erreur inconnue');
       });
     }
     
@@ -68,6 +87,20 @@ export default function AppointmentsScreen({ navigation }) {
   
   console.log('[AppointmentsScreen] Pagination - Page actuelle:', currentPage, 'Total pages:', totalPages);
   console.log('[AppointmentsScreen] Rendez-vous affichés:', paginatedAppointments.length, 'sur', appointments.length);
+  
+  // Log des rendez-vous paginés
+  if (paginatedAppointments.length > 0) {
+    console.log('[AppointmentsScreen] Rendez-vous de la page courante:');
+    paginatedAppointments.forEach((appointment, index) => {
+      console.log(`[AppointmentsScreen] Rendez-vous affiché ${index + 1}:`, {
+        id: appointment.id,
+        doctor: `${appointment.doctor?.title || ''} ${appointment.doctor?.lastName || ''}`,
+        date: appointment.date,
+        time: appointment.time,
+        status: appointment.status
+      });
+    });
+  }
 
   // Fonctions de gestion
   const handlePageChange = (page) => {
@@ -77,6 +110,13 @@ export default function AppointmentsScreen({ navigation }) {
 
   const handleLongPress = (appointment) => {
     console.log('[AppointmentsScreen] Appui long sur le rendez-vous:', appointment.id);
+    console.log('[AppointmentsScreen] Détails du rendez-vous sélectionné:', {
+      id: appointment.id,
+      doctor: `${appointment.doctor?.title || ''} ${appointment.doctor?.lastName || ''}`,
+      date: appointment.date,
+      time: appointment.time,
+      status: appointment.status
+    });
     setIsSelectionMode(true);
     toggleSelection(appointment.id);
   };
@@ -84,12 +124,15 @@ export default function AppointmentsScreen({ navigation }) {
   const confirmDelete = () => {
     if (appointmentToDelete) {
       console.log('[AppointmentsScreen] Confirmation de suppression du rendez-vous:', appointmentToDelete.id);
+      console.log('[AppointmentsScreen] Détails du rendez-vous à supprimer:', appointmentToDelete);
+      
       cancel(appointmentToDelete.id).then(() => {
         console.log('[AppointmentsScreen] Rendez-vous supprimé avec succès');
         setDeleteModalVisible(false);
         setAppointmentToDelete(null);
       }).catch(error => {
         console.error('[AppointmentsScreen] Erreur lors de la suppression du rendez-vous:', error);
+        console.error('[AppointmentsScreen] Détail de l\'erreur:', error.message || 'Erreur inconnue');
       });
     }
   };
@@ -101,6 +144,18 @@ export default function AppointmentsScreen({ navigation }) {
         ? prev.filter(id => id !== appointmentId)
         : [...prev, appointmentId];
       console.log('[AppointmentsScreen] Nouvelle sélection:', newSelection);
+      
+      // Log des rendez-vous sélectionnés
+      if (newSelection.length > 0) {
+        console.log('[AppointmentsScreen] Rendez-vous actuellement sélectionnés:');
+        newSelection.forEach(id => {
+          const appointment = appointments.find(a => a.id === id);
+          if (appointment) {
+            console.log(`[AppointmentsScreen] - ID: ${id}, Médecin: ${appointment.doctor?.lastName || 'Inconnu'}, Date: ${appointment.date}`);
+          }
+        });
+      }
+      
       return newSelection;
     });
   };
@@ -108,16 +163,30 @@ export default function AppointmentsScreen({ navigation }) {
   const handleBulkDelete = () => {
     if (selectedAppointments.length > 0) {
       console.log('[AppointmentsScreen] Suppression en masse de', selectedAppointments.length, 'rendez-vous');
+      console.log('[AppointmentsScreen] IDs des rendez-vous à supprimer:', selectedAppointments);
       setDeleteModalVisible(true);
     }
   };
 
   const confirmBulkDelete = () => {
     console.log('[AppointmentsScreen] Confirmation de suppression en masse');
+    console.log('[AppointmentsScreen] Nombre de rendez-vous à supprimer:', selectedAppointments.length);
+    
     selectedAppointments.forEach(id => {
       console.log('[AppointmentsScreen] Suppression du rendez-vous:', id);
+      const appointment = appointments.find(a => a.id === id);
+      if (appointment) {
+        console.log('[AppointmentsScreen] Détails du rendez-vous supprimé:', {
+          id: appointment.id,
+          doctor: `${appointment.doctor?.title || ''} ${appointment.doctor?.lastName || ''}`,
+          date: appointment.date,
+          time: appointment.time
+        });
+      }
+      
       cancel(id).catch(error => {
         console.error('[AppointmentsScreen] Erreur lors de la suppression du rendez-vous', id, ':', error);
+        console.error('[AppointmentsScreen] Détail de l\'erreur:', error.message || 'Erreur inconnue');
       });
     });
     setSelectedAppointments([]);
@@ -127,37 +196,71 @@ export default function AppointmentsScreen({ navigation }) {
 
   const exitSelectionMode = () => {
     console.log('[AppointmentsScreen] Sortie du mode de sélection');
+    console.log('[AppointmentsScreen] Nombre de rendez-vous sélectionnés avant de quitter:', selectedAppointments.length);
     setIsSelectionMode(false);
     setSelectedAppointments([]);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'PENDING': return '#F59E0B';
-      case 'CONFIRMED': return '#10B981';
-      case 'DECLINED': return '#EF4444';
-      default: return colors.textSecondary;
+    const getStatusColor = (status) => {
+    console.log('[AppointmentsScreen] Détermination de la couleur pour le statut:', status);
+    let color; // 1. On déclare la variable
+    switch (status) { // 2. On utilise le switch pour lui assigner une valeur
+      case 'PENDING': 
+        color = '#F59E0B';
+        break;
+      case 'CONFIRMED': 
+        color = '#10B981';
+        break;
+      case 'DECLINED': 
+        color = '#EF4444';
+        break;
+      default: 
+        color = colors.textSecondary;
+        break;
     }
+    console.log('[AppointmentsScreen] Couleur déterminée:', color);
+    return color;
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case 'PENDING': return 'En attente';
-      case 'CONFIRMED': return 'Confirmé';
-      case 'DECLINED': return 'Annulé';
-      default: return status;
+    console.log('[AppointmentsScreen] Traduction du statut:', status);
+    let text; // 1. On déclare la variable
+    switch (status) { // 2. On utilise le switch pour lui assigner une valeur
+      case 'PENDING': 
+        text = 'En attente';
+        break;
+      case 'CONFIRMED': 
+        text = 'Confirmé';
+        break;
+      case 'DECLINED': 
+        text = 'Annulé';
+        break;
+      default: 
+        text = status;
+        break;
     }
+    console.log('[AppointmentsScreen] Texte traduit:', text);
+    return text;
   };
 
   const renderAppointmentItem = ({ item }) => {
     const isSelected = selectedAppointments.includes(item.id);
     console.log('[AppointmentsScreen] Rendu du rendez-vous:', item.id, 'Sélectionné:', isSelected);
+    console.log('[AppointmentsScreen] Détails du rendez-vous rendu:', {
+      id: item.id,
+      doctor: `${item.doctor?.title || ''} ${item.doctor?.lastName || ''}`,
+      date: item.date,
+      time: item.time,
+      status: item.status
+    });
 
     const handleCardPress = () => {
       if (isSelectionMode) {
+        console.log('[AppointmentsScreen] Mode sélection activé, basculement de la sélection pour:', item.id);
         toggleSelection(item.id);
       } else {
         console.log('[AppointmentsScreen] Navigation vers les détails du rendez-vous:', item.id);
+        console.log('[AppointmentsScreen] Paramètres passés à la navigation:', { appointment: item });
         navigation.navigate('BookingStack', {
           screen: 'AppointmentDetails',
           params: { appointment: item }
@@ -236,13 +339,22 @@ export default function AppointmentsScreen({ navigation }) {
   };
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    console.log('[AppointmentsScreen] Rendu de la pagination, totalPages:', totalPages);
+    if (totalPages <= 1) {
+      console.log('[AppointmentsScreen] Pagination non nécessaire (1 page ou moins)');
+      return null;
+    }
 
     return (
       <View style={s.paginationContainer}>
         <Pressable
           style={[s.paginationButton, currentPage === 1 && s.paginationButtonDisabled]}
-          onPress={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+          onPress={() => {
+            if (currentPage > 1) {
+              console.log('[AppointmentsScreen] Navigation vers la page précédente:', currentPage - 1);
+              handlePageChange(currentPage - 1);
+            }
+          }}
           disabled={currentPage === 1}
         >
           <Ionicons name="chevron-back" size={20} color={currentPage === 1 ? colors.textTertiary : colors.primary} />
@@ -256,7 +368,12 @@ export default function AppointmentsScreen({ navigation }) {
 
         <Pressable
           style={[s.paginationButton, currentPage === totalPages && s.paginationButtonDisabled]}
-          onPress={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+          onPress={() => {
+            if (currentPage < totalPages) {
+              console.log('[AppointmentsScreen] Navigation vers la page suivante:', currentPage + 1);
+              handlePageChange(currentPage + 1);
+            }
+          }}
           disabled={currentPage === totalPages}
         >
           <Ionicons name="chevron-forward" size={20} color={currentPage === totalPages ? colors.textTertiary : colors.primary} />
@@ -266,7 +383,11 @@ export default function AppointmentsScreen({ navigation }) {
   };
 
   const renderSelectionToolbar = () => {
-    if (!isSelectionMode) return null;
+    console.log('[AppointmentsScreen] Rendu de la barre de sélection, isSelectionMode:', isSelectionMode);
+    if (!isSelectionMode) {
+      console.log('[AppointmentsScreen] Barre de sélection non affichée (mode désactivé)');
+      return null;
+    }
 
     return (
       <View style={s.selectionToolbar}>
@@ -289,61 +410,75 @@ export default function AppointmentsScreen({ navigation }) {
     );
   };
 
-  const renderEmptyState = () => (
-    <View style={s.emptyContainer}>
-      <View style={s.emptyIcon}>
-        <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
+  const renderEmptyState = () => {
+    console.log('[AppointmentsScreen] Rendu de l\'état vide (aucun rendez-vous)');
+    return (
+      <View style={s.emptyContainer}>
+        <View style={s.emptyIcon}>
+          <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
+        </View>
+        <Text style={s.emptyTitle}>Aucun rendez-vous</Text>
+        <Text style={s.emptySubtitle}>
+          Vous n'avez pas encore de rendez-vous programmés
+        </Text>
+        <Button 
+          title="Prendre un rendez-vous" 
+          onPress={() => {
+            console.log('[AppointmentsScreen] Navigation vers la recherche de médecins');
+            navigation.navigate('Search');
+          }}
+          style={s.emptyButton}
+        />
       </View>
-      <Text style={s.emptyTitle}>Aucun rendez-vous</Text>
-      <Text style={s.emptySubtitle}>
-        Vous n'avez pas encore de rendez-vous programmés
-      </Text>
-      <Button 
-        title="Prendre un rendez-vous" 
-        onPress={() => {
-          console.log('[AppointmentsScreen] Navigation vers la recherche de médecins');
-          navigation.navigate('Search');
-        }}
-        style={s.emptyButton}
-      />
-    </View>
-  );
+    );
+  };
 
-  const renderGuestState = () => (
-    <View style={s.guestContainer}>
-      <View style={s.calendarIconContainer}>
-        <Svg width="80" height="80" viewBox="0 0 128 128" fill="none">
-          {/* Calendrier arrière (plus bas + un peu à droite) */}
-          <Rect x="48" y="48" width="72" height="76" rx="4" fill="#1976D2"/>
-          <Rect x="48" y="48" width="72" height="20" fill="#0D47A1"/>
-          <Rect x="60" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
-          <Rect x="88" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
-          
-          {/* Calendrier avant */}
-          <Rect x="20" y="28" width="72" height="76" rx="4" fill="#29B6F6"/>
-          <Rect x="20" y="28" width="72" height="20" fill="#1976D2"/>
-          <Rect x="32" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
-          <Rect x="68" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
-          
-          {/* Jours */}
-          <Rect x="32" y="56" width="12" height="12" rx="2" fill="#1565C0"/>
-          <Rect x="52" y="56" width="12" height="12" rx="2" fill="#ffffff"/>
-          <Rect x="32" y="76" width="12" height="12" rx="2" fill="#ffffff"/>
-          <Rect x="52" y="76" width="12" height="12" rx="2" fill="#1565C0"/>
-          <Rect x="72" y="76" width="12" height="12" rx="2" fill="#FBC02D"/>
-        </Svg>
+  const renderGuestState = () => {
+    console.log('[AppointmentsScreen] Rendu de l\'état invité (utilisateur non connecté)');
+    return (
+      <View style={s.guestContainer}>
+        <View style={s.calendarIconContainer}>
+          <Svg width="80" height="80" viewBox="0 0 128 128" fill="none">
+            {/* Calendrier arrière (plus bas + un peu à droite) */}
+            <Rect x="48" y="48" width="72" height="76" rx="4" fill="#1976D2"/>
+            <Rect x="48" y="48" width="72" height="20" fill="#0D47A1"/>
+            <Rect x="60" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+            <Rect x="88" y="36" width="12" height="16" rx="2" fill="#0D47A1"/>
+            
+            {/* Calendrier avant */}
+            <Rect x="20" y="28" width="72" height="76" rx="4" fill="#29B6F6"/>
+            <Rect x="20" y="28" width="72" height="20" fill="#1976D2"/>
+            <Rect x="32" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+            <Rect x="68" y="16" width="12" height="16" rx="2" fill="#1976D2"/>
+            
+            {/* Jours */}
+            <Rect x="32" y="56" width="12" height="12" rx="2" fill="#1565C0"/>
+            <Rect x="52" y="56" width="12" height="12" rx="2" fill="#ffffff"/>
+            <Rect x="32" y="76" width="12" height="12" rx="2" fill="#ffffff"/>
+            <Rect x="52" y="76" width="12" height="12" rx="2" fill="#1565C0"/>
+            <Rect x="72" y="76" width="12" height="12" rx="2" fill="#FBC02D"/>
+          </Svg>
+        </View>
+
+        <Text style={s.guestTitle}>Planifiez vos rendez-vous</Text>
+        <Text style={s.guestSubtitle}>
+          Trouvez un professionnel de la santé et prenez rendez-vous en ligne à tout moment.
+        </Text>
+
+        <Pressable style={s.connectButton} onPress={handleLoginPress}>
+          <Text style={s.connectButtonText}>SE CONNECTER</Text>
+        </Pressable>
       </View>
+    );
+  };
 
-      <Text style={s.guestTitle}>Planifiez vos rendez-vous</Text>
-      <Text style={s.guestSubtitle}>
-        Trouvez un professionnel de la santé et prenez rendez-vous en ligne à tout moment.
-      </Text>
-
-      <Pressable style={s.connectButton} onPress={handleLoginPress}>
-        <Text style={s.connectButtonText}>SE CONNECTER</Text>
-      </Pressable>
-    </View>
-  );
+  console.log('[AppointmentsScreen] Rendu du composant, état actuel:', {
+    token: token ? 'Présent' : 'Absent',
+    appointmentsCount: appointments.length,
+    currentPage,
+    isSelectionMode,
+    selectedAppointmentsCount: selectedAppointments.length
+  });
 
   return (
     <View style={s.container}>
@@ -389,7 +524,10 @@ export default function AppointmentsScreen({ navigation }) {
         visible={deleteModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}
+        onRequestClose={() => {
+          console.log('[AppointmentsScreen] Fermeture du modal de suppression');
+          setDeleteModalVisible(false);
+        }}
       >
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>

@@ -39,22 +39,17 @@ const useBookingStore = create((set, get) => ({
   clearSelection: () => set({ selectedDoctor: null, selectedSlot: null }),
 
   // Actions pour les rendez-vous
-  bookAppointment: async () => {
-    const { selectedDoctor, selectedSlot } = get();
-    if (!selectedDoctor || !selectedSlot) {
-      throw new Error('Sélection incomplète');
+  // CORRECTION: La fonction bookAppointment doit accepter les données en paramètre
+  bookAppointment: async (appointmentData) => {
+    // Vérifier que les données sont fournies
+    if (!appointmentData) {
+      throw new Error('Données de rendez-vous manquantes');
     }
     
     try {
       set({ loading: true, error: null });
       
-      // Créer l'objet de rendez-vous
-      const appointmentData = {
-        doctorId: selectedDoctor.id,
-        startsAt: new Date(`${selectedSlot.date}T${selectedSlot.time}:00`).toISOString(),
-        endsAt: new Date(`${selectedSlot.date}T${selectedSlot.time}:00`).toISOString(), // À ajuster selon la durée du rendez-vous
-        status: 'PENDING'
-      };
+      console.log("[useBookingStore] Création du rendez-vous avec les données:", appointmentData);
       
       const appointment = await createAppointment(appointmentData);
       
@@ -64,6 +59,7 @@ const useBookingStore = create((set, get) => ({
       set({ loading: false });
       return appointment;
     } catch (error) {
+      console.error("[useBookingStore] Erreur lors de la réservation:", error);
       set({ 
         error: error.message || "Erreur lors de la réservation", 
         loading: false 
@@ -75,6 +71,7 @@ const useBookingStore = create((set, get) => ({
   loadMyAppointments: async (params = {}) => {
     set({ loading: true, error: null });
     try {
+      console.log("[useBookingStore] Chargement des rendez-vous avec les paramètres:", params);
       const response = await getMyAppointments(params);
       
       // Le backend retourne un objet paginé
