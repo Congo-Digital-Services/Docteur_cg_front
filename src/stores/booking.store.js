@@ -1,3 +1,4 @@
+// stores/booking.store.js
 import { create } from 'zustand';
 import { 
   createAppointment, 
@@ -7,6 +8,7 @@ import {
   getAppointment
 } from '../services/appointments';
 import { getDoctorOpeningHours, generateWeeklySlots } from '../services/slots';
+import useAuthStore from './auth.store';
 
 const useBookingStore = create((set, get) => ({
   // État pour la réservation
@@ -51,6 +53,7 @@ const useBookingStore = create((set, get) => ({
       
       console.log("[useBookingStore] Création du rendez-vous avec les données:", appointmentData);
       
+      // Le backend utilisera le contexte utilisateur pour trouver le patient correspondant
       const appointment = await createAppointment(appointmentData);
       
       // Rafraîchir la liste des rendez-vous
@@ -72,10 +75,14 @@ const useBookingStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       console.log("[useBookingStore] Chargement des rendez-vous avec les paramètres:", params);
+      
+      // Le backend utilisera le contexte utilisateur pour trouver le patient correspondant
       const response = await getMyAppointments(params);
       
       // Le backend retourne un objet paginé
       const appointments = response.items || [];
+      
+      console.log("[useBookingStore] Rendez-vous récupérés:", appointments);
       
       set({ 
         appointments, 
@@ -83,6 +90,7 @@ const useBookingStore = create((set, get) => ({
       });
       return response;
     } catch (error) {
+      console.error("[useBookingStore] Erreur lors du chargement des rendez-vous:", error);
       set({ 
         error: error.message || "Erreur lors du chargement des rendez-vous", 
         loading: false 
@@ -94,6 +102,7 @@ const useBookingStore = create((set, get) => ({
   loadAppointmentDetails: async (id) => {
     set({ loading: true, error: null });
     try {
+      console.log("[useBookingStore] Chargement des détails du rendez-vous:", id);
       const appointment = await getAppointment(id);
       set({ 
         appointmentDetails: appointment, 
@@ -101,6 +110,7 @@ const useBookingStore = create((set, get) => ({
       });
       return appointment;
     } catch (error) {
+      console.error("[useBookingStore] Erreur lors du chargement des détails du rendez-vous:", error);
       set({ 
         error: error.message || "Erreur lors du chargement des détails du rendez-vous", 
         loading: false 
@@ -112,6 +122,7 @@ const useBookingStore = create((set, get) => ({
   updateAppointment: async (appointmentData) => {
     set({ loading: true, error: null });
     try {
+      console.log("[useBookingStore] Mise à jour du rendez-vous:", appointmentData);
       const updatedAppointment = await updateAppointment(appointmentData);
       
       // Mettre à jour le rendez-vous dans la liste
@@ -127,6 +138,7 @@ const useBookingStore = create((set, get) => ({
       
       return updatedAppointment;
     } catch (error) {
+      console.error("[useBookingStore] Erreur lors de la mise à jour du rendez-vous:", error);
       set({ 
         error: error.message || "Erreur lors de la mise à jour du rendez-vous", 
         loading: false 
@@ -138,6 +150,7 @@ const useBookingStore = create((set, get) => ({
   cancelAppointment: async (id) => {
     set({ loading: true, error: null });
     try {
+      console.log("[useBookingStore] Annulation du rendez-vous:", id);
       await cancelAppointment(id);
       
       // Mettre à jour le statut du rendez-vous dans la liste
@@ -151,6 +164,7 @@ const useBookingStore = create((set, get) => ({
         loading: false
       }));
     } catch (error) {
+      console.error("[useBookingStore] Erreur lors de l'annulation du rendez-vous:", error);
       set({ 
         error: error.message || "Erreur lors de l'annulation du rendez-vous", 
         loading: false 

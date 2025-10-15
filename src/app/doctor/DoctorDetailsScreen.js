@@ -242,7 +242,7 @@ console.log("endsAt typeof:", typeof appointmentData.endsAt, appointmentData.end
             text: 'OK',
             onPress: () => {
               setShowBookingModal(false);
-              navigation.navigate('AppointmentDetails', { appointmentId: appointment.id });
+              // navigation.navigate('AppointmentDetails', { appointment: appointment });
             }
           }
         ]

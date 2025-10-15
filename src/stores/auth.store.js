@@ -10,15 +10,16 @@ import {
   resendVerificationCode as apiResendVerificationCode,
   guestAuth as apiGuestAuth
 } from '@/services/auth';
+import { getPatientData, createPatientProfile } from '@/services/patient'; // Assurez-vous que ce service est importé
 
 const useAuthStore = create((set, get) => ({
   token: null,
   user: null,
+  patient: null, // Cet état contiendra maintenant uniquement l'objet patient imbriqué
   loading: false,
   confirmationToken: null,
   passwordResetToken: null,
   isGuest: false,
-  // NOUVEL ÉTAT pour suivre l'initialisation
   isInitialized: false,
 
   init: async () => {
@@ -29,27 +30,37 @@ const useAuthStore = create((set, get) => ({
       
       if (token) {
         set({ token, isGuest });
-        // On tente de vérifier le token auprès du backend
         const { client } = await apiMe();
-        set({ user: client });
         console.log("AuthStore: Initialized with user.", client.email);
+        
+        if (client.role === 'PATIENT') {
+          console.log("AuthStore: User is a patient, fetching patient data");
+          try {
+            const patientData = await getPatientData();
+            // CORRECTION : On stocke uniquement l'objet patient imbriqué pour simplifier l'accès
+            set({ patient: patientData.patient });
+          } catch (error) {
+            console.log("AuthStore: Patient profile not found, creating one");
+            const newPatientData = await createPatientProfile();
+            // CORRECTION : On stocke également l'objet patient imbriqué ici
+            set({ patient: newPatientData.patient });
+          }
+        }
+        
+        set({ user: client });
       } else {
         console.log("AuthStore: No token found, user is logged out.");
       }
     } catch (error) {
       console.error("AuthStore: Failed to initialize auth.", error);
-      // En cas d'erreur (token invalide, réseau...), on nettoie tout
-      set({ token: null, user: null, isGuest: false });
+      set({ token: null, user: null, patient: null, isGuest: false });
       await AsyncStorage.multiRemove(['auth_token', 'is_guest']);
     } finally {
-      // TRÈS IMPORTANT : on marque l'initialisation comme terminée dans tous les cas
       set({ isInitialized: true });
       console.log("AuthStore: Initialization finished.");
     }
   },
 
-  // ... (le reste de vos fonctions login, register, etc. reste inchangé)
-  // credentials = { email, password, phone? }
   login: async (credentials) => {
     set({ loading: true });
     try {
@@ -60,6 +71,21 @@ const useAuthStore = create((set, get) => ({
         ['auth_token', access_token],
         ['is_guest', 'false']
       ]);
+      
+      if (client.role === 'PATIENT') {
+        console.log("AuthStore: User is a patient, fetching patient data");
+        try {
+          const patientData = await getPatientData();
+          // CORRECTION : On stocke uniquement l'objet patient imbriqué
+          set({ patient: patientData.patient });
+        } catch (error) {
+          console.log("AuthStore: Patient profile not found, creating one");
+          const newPatientData = await createPatientProfile();
+          // CORRECTION : On stocke également l'objet patient imbriqué ici
+          set({ patient: newPatientData.patient });
+        }
+      }
+      
       set({ token: access_token, user: client, loading: false, isGuest: false });
       return true;
     } catch (e) {
@@ -68,7 +94,6 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // data = { email, password, firstName, lastName, phone?, role? }
   register: async (data) => {
     set({ loading: true });
     try {
@@ -98,6 +123,20 @@ const useAuthStore = create((set, get) => ({
         ['is_guest', 'false']
       ]);
       await AsyncStorage.removeItem('confirm_token');
+      
+      if (user.role === 'PATIENT') {
+        console.log("AuthStore: User is a patient, fetching patient data");
+        try {
+          const patientData = await getPatientData();
+          // CORRECTION : On stocke uniquement l'objet patient imbriqué
+          set({ patient: patientData.patient });
+        } catch (error) {
+          console.log("AuthStore: Patient profile not found, creating one");
+          const newPatientData = await createPatientProfile();
+          // CORRECTION : On stocke également l'objet patient imbriqué ici
+          set({ patient: newPatientData.patient });
+        }
+      }
       
       set({ 
         token: access_token, 
@@ -143,6 +182,20 @@ const useAuthStore = create((set, get) => ({
         ['is_guest', 'false']
       ]);
       await AsyncStorage.removeItem('reset_token');
+      
+      if (user.role === 'PATIENT') {
+        console.log("AuthStore: User is a patient, fetching patient data");
+        try {
+          const patientData = await getPatientData();
+          // CORRECTION : On stocke uniquement l'objet patient imbriqué
+          set({ patient: patientData.patient });
+        } catch (error) {
+          console.log("AuthStore: Patient profile not found, creating one");
+          const newPatientData = await createPatientProfile();
+          // CORRECTION : On stocke également l'objet patient imbriqué ici
+          set({ patient: newPatientData.patient });
+        }
+      }
       
       set({ 
         token: access_token, 
@@ -194,6 +247,7 @@ const useAuthStore = create((set, get) => ({
       set({ 
         token: access_token, 
         user: null, 
+        patient: null,
         loading: false,
         isGuest: true
       });
@@ -210,6 +264,7 @@ const useAuthStore = create((set, get) => ({
     set({ 
       token: null, 
       user: null, 
+      patient: null,
       confirmationToken: null, 
       passwordResetToken: null,
       isGuest: false
